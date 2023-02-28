@@ -1,0 +1,24 @@
+td {
+    border: 1px solid #333;
+}
+body {
+  font-size: small;
+}
+tt {
+  background: #ddd;
+}
+
+.img {margin-left: 1.5em; width: 110px; height:135px; float:left;}
+
+.f {background:#000; color:#fff; border: 0;}
+.e {background:#ddd; border: 0;}
+.b {background:#a00; border: 0;}
+.x {background:#0ff; border: 0;}
+
+.s {height: 0px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-spacing: 0;
+    border-collapse: collapse;}
+.s td {border:none;}

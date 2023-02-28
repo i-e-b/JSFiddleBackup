@@ -1,0 +1,2 @@
+Simple XOR encryption:<br/>
+<pre id="out"></pre>

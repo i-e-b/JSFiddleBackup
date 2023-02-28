@@ -1,0 +1,39 @@
+function gray_encode(n) {
+  return n ^ (n >> 1);
+}
+
+// linear time decode (most common)
+function gray_decode_lin(n) {
+  var p = n;
+  while (n >>= 1) p ^= n;
+  return p;
+}
+
+// log time branchless (from http://aggregate.org/MAGIC )
+function gray_decode(n) {
+  n ^= (n >> 16);
+  n ^= (n >> 8);
+  n ^= (n >> 4);
+  n ^= (n >> 2);
+  n ^= (n >> 1);
+  return n;
+}
+
+
+
+
+var outp = document.getElementById("output");
+
+function byteStr(v) {
+  return v.toString(2).padStart(8, '0');
+}
+
+
+outp.innerHTML += "\r\nBinary in | Gray code | Decoded bin"
+
+for (var i = 0; i < 256; i++) {
+  var enc = gray_encode(i);
+  var dec = gray_decode(enc);
+  outp.innerHTML += "\n" + byteStr(i) + " -> " + byteStr(enc) + " -> " + byteStr(dec);
+  if (dec != i) outp.innerHTML += " <---- ERROR!";
+}

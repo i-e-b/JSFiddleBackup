@@ -1,0 +1,12 @@
+document.onmousemove = function(event) {
+  var eye = document.getElementsByClassName("eye");
+  for (var i = 0; i < eye.length; i++) {
+  	var aye = eye[i];
+  	var rect = aye.getBoundingClientRect();
+    var x = (rect.left) + (rect.width / 2);
+    var y = (rect.top) + (rect.height / 2);
+    var rad = Math.atan2(event.pageX - x, event.pageY - y);
+    var rot = (rad * (180 / Math.PI) * -1) + 180;
+    aye.style.transform = 'rotate(' + rot + 'deg)';
+  }
+};

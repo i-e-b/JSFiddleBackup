@@ -1,0 +1,4 @@
+<h3>
+Quick test of 'Leonardo' numbers (related to Fibonacci)
+</h3>
+<tt id="output"></tt>

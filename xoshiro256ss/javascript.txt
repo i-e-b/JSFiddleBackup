@@ -1,0 +1,86 @@
+
+// State must be BigInt
+function splitmix64(state) {
+  var n64 = BigInt("0xFFFFFFFFFFFFFFFF");
+	var result = BigInt(state);
+  
+	result = (result + BigInt("0x9E3779B97f4A7C15")) & n64;
+	result = (result ^ (result >> BigInt(30)) ) * BigInt("0xBF58476D1CE4E5B9");
+  result = result & n64;
+	result = (result ^ (result >> BigInt(27)) ) * BigInt("0x94D049BB133111EB");
+  result = result & n64;
+	return (result ^ (result >> BigInt(31))) & n64;
+}
+
+function newXoshiro256pState() {
+	return [BigInt(0),BigInt(0),BigInt(0),BigInt(0)];
+}
+
+function xorshift256_init(seed) {
+	var result = newXoshiro256pState();
+
+  result[0] = splitmix64(BigInt(seed));
+  result[1] = splitmix64(result[0]);
+  result[2] = splitmix64(result[2]);
+  result[3] = splitmix64(result[3]);
+
+	return result;
+}
+
+function rol64(xp, kp) {
+  var n64 = BigInt("0xFFFFFFFFFFFFFFFF");
+	var x = BigInt(xp);
+  var k = BigInt(kp);
+
+	// mask to keep 'b' inside (64 - k) bits
+  var m1 = (n64 << BigInt(k));
+  var m2 = n64 ^ m1;
+  
+  
+	var a = (x << k) & n64;
+  var b = (x >> (BigInt(64) - k)) & m2;
+	return (a | b) & n64;
+}
+
+function xoshiro256p(s) {
+  var n64 = BigInt("0xFFFFFFFFFFFFFFFF");
+	var result = rol64(s[1] * BigInt(5), 7) * BigInt(9);
+  var t = (s[1] << BigInt(17)) & n64;
+
+	s[2] = (s[2] ^ s[0]) & n64;
+	s[3] = (s[3] ^ s[1]) & n64;
+	s[1] = (s[1] ^ s[2]) & n64;
+	s[0] = (s[0] ^ s[3]) & n64;
+
+	s[2] = (s[2] ^ t) & n64;
+	s[3] = rol64(s[3], 45);
+
+	return result & n64;
+}
+
+var outp = document.getElementById("output");
+var seed = new Date().valueOf();
+//var seed = 123456;
+var state = xorshift256_init(seed);
+
+for	(var i = 0; i < 20; i++) {
+	outp.innerHTML += xoshiro256p(state).toString(16) + "\n";
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

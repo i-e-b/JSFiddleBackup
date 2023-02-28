@@ -1,0 +1,83 @@
+
+// round a float number to a range of decimal places
+// Native JS
+function floatToString(floatValue, minDecimalPlaces, maxDecimalPlaces) {
+  var result = "";
+  var dotted = false;
+  var uvalue = floatValue;
+  
+  // sign, or space for positive alignment
+  if (uvalue < 0) {
+    result += '-';
+    uvalue = -uvalue;
+  } else {
+  	result += " ";
+  }
+  
+  var scale = Math.pow(10, maxDecimalPlaces);
+	var rounded = Math.round(uvalue * scale) / scale;
+  
+  var intpart = Math.trunc(rounded);
+  var fracpart = rounded - intpart;
+  
+  // integral part
+  result += intpart;
+  if (maxDecimalPlaces < 1) return result;
+  
+  // do fractional part
+  var tail = minDecimalPlaces;
+  var head = maxDecimalPlaces;
+  
+  while (head > 0     // we haven't hit max dp
+      && fracpart > 0 // there is still value in the fraction
+  ) {
+  	fracpart *= 10; // shift
+    var digit = Math.trunc(fracpart); // truncate
+    if (head == 1) digit = Math.round(fracpart);
+    fracpart -= digit;
+
+    head--;
+    tail--;
+
+		if (!dotted){result+="."; dotted = true;}
+    result += digit;
+  }
+  
+  while (tail > 0) {
+		if (!dotted){result+="."; dotted = true;}
+    result += "0";
+    tail--;
+  }
+  
+	return result;
+}
+
+
+var elem = document.getElementById("outp");
+elem.innerText += "A: " + floatToString(-10.000001, 3, 4) + " (-> -10.000)\r\n";
+elem.innerText += "B: " + floatToString(10.000001, 3, 4) + " (-> 10.000)\r\n";
+elem.innerText += "C: " + floatToString(10.00001, 3, 4) + " (-> 10.000)\r\n";
+elem.innerText += "D: " + floatToString(10.00009, 3, 4) + " (-> 10.0001)\r\n";
+elem.innerText += "E: " + floatToString(-10.00009, 3, 4) + " (-> -10.0001)\r\n";
+elem.innerText += "F: " + floatToString(-10.000001, 2, 6) + " (-> -10.000001)\r\n";
+elem.innerText += "G: " + floatToString(10.0001, 3, 4) + " (-> 10.0001)\r\n";
+elem.innerText += "H: " + floatToString(-10.000001, 2, 5) + " (-> -10.00)\r\n";
+elem.innerText += "I: " + floatToString(-10.000001, 0, 3) + " (-> -10)\r\n";
+elem.innerText += "J: " + floatToString(-10.001, 0, 3) + " (-> -10.001)\r\n";
+elem.innerText += "K: " + floatToString(-10.0009, 0, 3) + " (-> -10.001)\r\n";
+elem.innerText += "L: " + floatToString(-10.0005, 0, 3) + " (-> -10.001)\r\n";
+elem.innerText += "M: " + floatToString(-10.1, 0, 0) + " (-> -10)\r\n";
+elem.innerText += "N: " + floatToString(-10.5, 0, 0) + " (-> -11)\r\n";
+elem.innerText += "O: " + floatToString(10.5, 0, 0) + " (-> 11)\r\n";
+
+elem.innerText += "P: " + floatToString(4.99999, 3, 4) + " (-> 5.000)\r\n";
+elem.innerText += "Q: " + floatToString(4.99999, 2, 2) + " (-> 5.00)\r\n";
+elem.innerText += "R: " + floatToString(-4.99999, 2, 2) + " (-> -5.00)\r\n";
+
+elem.innerText += "S: " + floatToString(4.09090, 5, 5) + " (-> 4.09090)\r\n";
+elem.innerText += "T: " + floatToString(4.23459, 5, 5) + " (-> 4.23459)\r\n";
+elem.innerText += "U: " + floatToString(4.234599, 5, 5) + " (-> 4.23460)\r\n";
+elem.innerText += "V: " + floatToString(4.01234, 2, 2) + " (-> 4.01)\r\n";
+elem.innerText += "W: " + floatToString(12312312466.6650, 2, 2) + " (-> 12312312466.67)\r\n";
+
+//[END]

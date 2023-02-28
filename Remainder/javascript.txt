@@ -1,0 +1,58 @@
+
+// Remainder without division or multiplication
+function remainder (a, b) {
+	if (a < b) return a;
+  if (a - b < b) return a - b;
+  
+  a = remainder(a, b+b);
+  if (a < b) return a;
+  return a - b;
+}
+
+// Iterative version, using bit shifts
+// Does not support float 'b's correctly
+function remiter (a, b) {
+  var i = 0;
+  
+  while (a >= b) {
+  	var g = a - b;
+  	if (g < b) {a = g; break;}
+    b <<= 1;
+    i++;
+  }
+  
+  while (i > 0) {
+  	i--;
+    b >>= 1;
+  	if (a >= b) {a = a - b;}
+  }
+  return a;
+}
+
+
+var examples = [
+	[1001, 10],
+  [255, 5],
+  [10007, 151],
+  [123456789, 123]
+];
+for (var x = 0; x < 10; x++) {
+	examples.push([((Math.random()+1)* 10000000)|0, ((Math.random()+1)* 10000)|0]);
+}
+for (var x = 0; x < 10; x++) {
+	examples.push([(Math.random()+1)* 1000000000, ((Math.random()+1)* 100)|0]);
+}
+
+var outp = document.getElementById("output");
+
+for (var i = 0; i < examples.length; i++) {
+	var x = examples[i];
+  var desc = "\r\n"+x[0]+" / "+x[1]+" ";
+  
+  outp.innerText += desc;
+  if (desc.length < 50) outp.innerText += ("-".repeat(50-desc.length));
+  outp.innerText += " R= "+remainder(x[0], x[1]);
+  outp.innerText += " mod= "+(x[0] % x[1]);
+  outp.innerText += " Ri= "+remiter(x[0], x[1]);
+}
+

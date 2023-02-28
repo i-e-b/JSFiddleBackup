@@ -1,0 +1,22 @@
+var outp = document.getElementById("output");
+
+// Leonardo numbers are given by:
+//    LP[0] = LP[1] = 1 and LP[t+2] = LP[t+1]+LP[t]+1
+// Nb. Since  LP[t] = LP[t+2]-LP[t+1]-1, we also have
+//    LP[-1] = LP[1]-LP[0]-1 = -1, and
+//    LP[-2] = LP[0]-LP[-1]-1 = 1-(-1)-1 = 1
+// Also sum_{t=0}^{n} LP[t] = LP[n+2]-n-2
+
+
+
+outp.innerText = "0 -> 1\r1 -> 1\r";
+
+var n_2 = 1;
+var n_1 = 1;
+
+for (var i = 2; i < 100; i++) {
+	var l = n_1 + n_2 + 1;
+  outp.innerText += i+" -> "+l+"\r";
+  n_2 = n_1;
+  n_1 = l;
+}

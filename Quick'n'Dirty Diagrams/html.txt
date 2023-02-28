@@ -1,0 +1,225 @@
+<h1>Quick diagram</h1>
+<p>A simple boxes-and-arrows diagram generator script.
+Enter your script in a <tt>div</tt> element with <tt>class="diagram"</tt>
+and a valid <tt>id</tt> property (it doesn't matter what it is)</p>
+<p><tt>0,0</tt> is always the top left of a diagram.
+The bottom right will be set to the maximum extent of all pins.</p>
+
+<div class="diagram" id="one">
+  # This is the code that
+  # will be replaced by a diagram
+  fill ffa
+  
+  Pin a1 0 0
+  offset a2 a1 100 100
+  Box a1 a2 hello,\nworld!
+  split a3 a1 a2
+  split x1 a3 a2
+  corner x1 a2 x1
+  
+  clearfill
+  
+  Pin b1 200 0
+  offset b2 b1 100 100
+  Box b1 b2
+  offset b3 b1 0 100
+  split x2 b1 b3
+  
+  fliparrow x2 x1 flopped
+  move 0 20 x1 x2
+  fliparrow x1 x2 flipped
+  move 0 -30 x1 x2
+  arrow x1 x2 forwards
+  move 0 -20 x1 x2
+  arrow x2 x1 backwards
+</div>
+
+<div class="diagram" id="two">
+ # Any element with the marker class
+ # and an id should be rendered
+ 
+ Pin tl 0 0
+ Offset tr tl 100 0
+ Offset br tr 0 100
+ Box tl br Start
+ Split ax tr br
+ 
+ Pin b 200 0
+ Offset r b 100 100
+ Box b r End
+ Corner bx b r
+ Split bx b bx
+ 
+ Stroke 0f0
+ Arrow ax bx Our Process
+ ClearStroke
+ 
+ # Using 'project' to split up a line
+ Project cb br bx ax
+ Project ct ax b bx
+ Line cb ct Not _______Us
+ Line br cb
+ Arrow ct b
+</div>
+
+<div class="diagram" id="three">
+ # Example of moving a template around
+ 
+ # Define the box
+ pin a_tl 0 0
+ pin a_cl 0 25
+ pin a_br 100 50
+ pin a_cr 100 25
+ 
+ # Move it around
+ move 0 0 a_tl a_br a_cl a_cr
+ box a_tl a_br Steal underpants
+ offset x1 a_cr 0 0
+ 
+ move 150 0 a_tl a_br a_cl a_cr
+ box a_tl a_br ?
+ offset x2 a_cl 0 0
+ offset x3 a_cr 0 0
+ 
+ move 150 0 a_tl a_br a_cl a_cr
+ box a_tl a_br Profit!
+ offset x4 a_cl 0 0
+ offset x5 a_cr 0 0
+ corner x6 a_tl a_br
+ split x6 x6 a_br
+ 
+ # Set our template back to 0,0 and move again
+ reset a_tl a_br a_cl a_cr
+ move 0 80 a_tl a_br a_cl a_cr
+ smallbox a_tl a_br Metasystem parallel to project
+ 
+ arrow x1 x2
+ arrow x3 x4
+ 
+ # Fancy arrow
+ corner x7 x6 a_cr
+ flipline a_cr x7 (back leakage)
+ arrow x7 x6
+ 
+ # Move a box over a known point
+ pin mt1 0 0
+ pin mt2 10 20
+ centre x7 mt1 mt2
+ box mt1 mt2 $
+</div>
+
+<div class="diagram" id="three_point_five">
+ # Same as above, but using AutoBox
+ 
+ # Draw boxes
+ autobox pants 0 0 100 50 Steal underpants
+ autobox quest 150 0 100 50 ?
+ autobox prof 300 0 100 50 Profit!
+ fill eee
+ autobox crit 0 80 75 50 Many critical components
+ 
+ # Draw lines
+ corner c_crit quest_b crit_r
+ arrow pants_r quest_l
+ arrow quest_r prof_l
+ line crit_r c_crit Note: look into this
+ arrow c_crit quest_b
+ 
+ # auto-table
+ fill ffa
+ Translate 250 80
+ AutoTable 3 tabl 0 0 150 80 H1|H2|H3 | R1C1|R1C2|R1C3 | R2C1|R2C2|R2C3 | R3D2
+ 
+</div>
+
+<div class="diagram" id="four">
+  Group 0 0 -- Overlapping boxes --
+  Pin tl 0 0
+  Pin br 100 70
+  Split m tl br
+  
+  Box tl br One
+  MoveOver br m tl br
+  Box tl br Two
+  
+  Group 0 110 -- Box table --
+  Pin tl 0 0
+  Pin br 150 110
+  Fill aea
+  # Note that the table doesn't have to be complete
+  Table 3 tl br H1|H2|H3 | R1C1|R1C2|R1C3 | R2C1|R2C2|R2C3 | R3D2
+</div>
+
+<div class="diagram clear">This should not be converted</div>
+<div id="three">Neither should this.</div>
+
+<pre>
+
+Commands are separated by newlines. Blank lines are ignored.
+Commands: (command names are case insensitive, but everything else is case sensitive)
+    # [text...]  -- Comment. Ignores the line.
+    
+    Pin name x y  -- set named pin to a position.
+                     Pins are defined as needed.
+                     If you set the value of a pin more than once, it gets updated.
+                     
+    Box pin1 pin2 [text...]  -- draw a box between two pins, with optional text.
+                                The box will remain in place if the pins are later moved.
+    
+    Table cols pin1 pin2 [text...]
+                           -- Same as 'Box', but present as a table. '|' splits cells in the text.
+                              'cols' is the numeric X dimension of the table. Rows are added to 
+                              fit cells.
+    
+    Split name pin1 pin2  -- create a new pin half-way between two others
+    
+    Move x y [pin1..pinN] -- move all named pins by the given offset
+    
+    MoveTo pin0 [pin1..pinN] -- move pins [1..n] as a group so their origin is at pin0
+    
+    MoveOver pin0 pin1 [pin2..pinN] -- move pins [1..n] as a group so pin1's origin is at pin0
+    
+    Centre pin0 [pin1..pinN] -- move pins [1..n] as a group so their centre is at pin0
+    
+    Fill rgb    -- set fill colour for boxes. Should be a CSS hex colour (e.g. `eef`, `ff7`)
+    Stroke rgb  -- set colour for lines and arrows. Should be a CSS hex colour (e.g. `eef`, `ff7`)
+    
+    ClearFill   -- reset fill colour to default.
+    ClearStroke -- reset line colour to default.
+    
+    Project name pinA pinB pinX  -- create a new pin by projecting X onto the line A->B
+    
+    Offset name pin1 dx dy  -- create a new pin offset from an existing one
+    
+    Line pin1 pin2 [text...]  -- draw a line between two pins, with optional text along the line
+    
+    FlipLine pin1 pin2 [text...]  -- Same as Line, but text is upside-down
+    
+    Arrow pin1 pin2 [text...]  -- draw a line between pins,
+                                  with an arrow pointing at 'pin2',
+                                  and optional text along the line.
+                                  
+    FlipArrow pin1 pin2 [text...] -- same as arrow, but the text is upside-down
+    
+    Reset [pin1..pinN] -- offset all named pins by the same amount, so the
+                          top left pin ends up at 0,0
+    
+    Corner name pin1 pin2  -- create a new pin at (pin1.x, pin2.y)
+    
+    AutoBox name x y width height [text...]
+                                  -- Create a box at the given points, and create 8 new pins
+                                     around the sides (name_tl, name_t, name_tr,
+                                                       name_l,          name_r,
+                                                       name_bl, name_b, name_br)
+                                                       
+    AutoTable cols name x y width height [text...]
+                           -- Same as 'AutoBox', but present as a table. '|' splits cells in the text.
+                              'cols' is the numeric X dimension of the table. Rows are added to 
+                              fit cells. (ALSO, maybe add a pin for the centre of each cell?)
+                              
+    Group x y [text...]     -- same as Translate
+    Translate x y [text...] -- New pins and boxes are offset by this amount. Doesn't affect already set pins. Use `Translate 0 0` to reset
+    
+</pre>
+
+<p>[END]</p>

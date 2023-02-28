@@ -1,0 +1,359 @@
+// A text layout in 3 columns
+let exampleLayout = [
+  {name:"Root", w:600, h:400},
+  {name:"Column", w:"31%", h:"100%", next:{rel:"TR", x:"3.3%"}, prev:{rel:"TL"}},
+  {name:"Line", next:{rel:"BL", y:"0.5em"}},
+  {name:"Word", next:{rel:"TR", x:"0.5em"}},
+  {name:"Glyph", glue:true}
+];
+
+// Text to fill this layout
+// We will process this into glyphs/breaks in the code.
+// https://penelope.uchicago.edu/Thayer/E/Roman/Texts/Cicero/de_Finibus/1*.html   10/32
+let paramark = "¶";
+let exampleInput = "But I must explain to you how all this mistaken idea of denouncing pleasure and praising pain was born and I will give you a complete account of the system, and expound the actual teachings of the great explorer of the truth, the master-builder of human happiness. No one rejects, dislikes, or avoids pleasure itself, because it is pleasure, but because those who do not know how to pursue pleasure rationally encounter consequences that are extremely painful. Nor again is there anyone who loves or pursues or desires to obtain pain of itself, because it is pain, but because occasionally circumstances occur in which toil and pain can procure him some great pleasure.¶To take a trivial example, which of us ever undertakes laborious physical exercise, except to obtain some advantage from it? But who has any right to find fault with a man who chooses to enjoy a pleasure that has no annoying consequences, or one who avoids a pain that produces no resultant pleasure? ¶On the other hand, we denounce with righteous indignation and dislike men who are so beguiled and demoralized by the charms of pleasure of the moment, so blinded by desire, that they cannot foresee the pain and trouble that are bound to ensue; and equal blame belongs to those who fail in their duty through weakness of will, which is the same as saying through shrinking from toil and pain.¶These cases are perfectly simple and easy to distinguish. In a free hour, when our power of choice is untrammelled and when nothing prevents our being able to do what we like best, every pleasure is to be welcomed and every pain avoided. But in certain circumstances and owing to the claims of duty or the obligations of business it will frequently occur that pleasures have to be repudiated and annoyances accepted.¶The wise man therefore always holds in these matters to this principle of selection: he rejects pleasures to secure other greater pleasures, or else he endures pains to avoid worse pains.";
+
+// Set font, and measure the 'em' value
+var canvas = document.getElementById("target");
+var ctx = canvas.getContext("2d");
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+ctx.font = '12px Arial';
+let em = ctx.measureText('M').width; // few browsers support font measurement correctly.
+
+
+// ANCILLIARY
+
+function renderChain(chain) {
+	let root = chain[0].nodes[0];
+	ctx.strokeStyle = "#fdd";
+  ctx.strokeRect(root.x, root.y, root.w, root.h);
+
+	ctx.fillStyle = "#000";
+	ctx.strokeStyle = "#ddf";
+  for (let cli = 0; cli < chain.length; cli++){
+  	let nodes = chain[cli].nodes;
+    
+    for (let i = 1; i < nodes.length; i++) {
+      let item = nodes[i];
+      if (item.chr) {
+        ctx.fillText(item.chr, item.x, item.y + item.h);
+      } else {
+      	ctx.strokeRect(item.x, item.y, item.w, item.h);
+      }
+    }
+  }
+}
+
+function log(msg) {
+	document.getElementById("diag").innerText += "\r\n"+msg;
+}
+
+// IMPLEMENTATION
+
+// Work out % and em sizes, replace empty with defaults
+function normaliseType(type, parent) {
+	if (type.next == null) type.next = {};
+  if (type.prev == null) type.prev = {};
+  if (parent == null) parent = {type:{w:-1, h:-1}}
+  
+  let fix = function(measure, ref) {
+  	if (typeof(measure) === 'number') return measure;
+    if (measure.endsWith('%')) return (measure.slice(0, -1) * 0.01) * ref;
+    if (measure.endsWith('em')) return (measure.slice(0,-2) * em);
+    throw new error('Unknown measure: '+measure);
+  };
+  
+	return {
+  	w: fix(type.w || 0, parent.type.w),
+    h: fix(type.h || 0, parent.type.h),
+    glue: type.glue || false,
+    name: type.name || "untitled",
+    next: {
+      rel: type.next.rel || "TR",
+      x: fix(type.next.x || 0, parent.type.w),
+      y: fix(type.next.y || 0, parent.type.h)
+    },
+    prev: {
+      rel: type.prev.rel || "TL",
+      x: fix(type.prev.x || 0, parent.type.w),
+      y: fix(type.prev.y || 0, parent.type.h)
+    }
+  };
+}
+
+// Convert a layout type to a content chain node.
+function buildContentChain(layout) {
+	let outp = [];
+  let prev = null;
+  for (let i=0; i<layout.length; i++){
+  	let type = normaliseType(layout[i], prev);
+    prev = {
+    	type: type,
+      nodes: []
+    };
+    outp.push(prev);
+  }
+  return outp;
+}
+
+function breakStringToInput(str){
+	let outp = [];
+  for (let i = 0; i < str.length; i++) {
+  	var chr = str[i];
+  	if (chr == ' ') outp.push({brk:1}); // space is a 1 level break (new word)
+    else if (chr == paramark) outp.push({brk:2}); // new line
+    else {
+    	var x = ctx.measureText(chr);
+    	outp.push({brk:0, chr:chr, w:x.width, h:em});
+    }
+  }
+  return outp;
+}
+
+function refPoint(type, node) {
+	switch (type.rel) {
+  	case "TL":
+    	return {x:node.x, y:node.y};
+  	case "TR":
+    	return {x:node.x+node.w, y:node.y};
+  	case "BL":
+    	return {x:node.x, y:node.y+node.h};
+  	case "BR":
+    	return {x:node.x+node.w, y:node.y+node.h};
+  }
+}
+
+// sets the x and y position of 'nextNode'
+function relpos(prevType, nextType, prevNode, nextNode) {
+	let pref = refPoint(prevType, nextNode);
+  let nref = refPoint(nextType, prevNode);
+  
+  nextNode.x = (pref.x||0) + (prevType.x||0) + (nref.x||0) + (nextType.x||0);
+  nextNode.y = (pref.y||0) + (prevType.y||0) + (nref.y||0) + (nextType.y||0);
+}
+function lastNode(chainItem) {return chainItem.nodes.slice(-1)[0];}
+function endOf(arr) {return arr.slice(-1)[0];}
+
+function buildInitialChain(chain) {
+	// Set up node zero on all but the last type in the chain
+  chain[0].nodes.push({
+  	x:0, y:0, w:chain[0].type.w, h:chain[0].type.h,
+    p:0 // root can't have a parent
+  });
+  for (let i = 1; i < chain.length; i++) {
+  	let n = {
+      w:chain[i].type.w, h:chain[i].type.h, p:0
+    };
+    relpos(chain[i-1].type.prev, chain[i].type.prev, lastNode(chain[i-1]), n);
+    // initial position is prev->prev
+  	chain[i].nodes.push(n);
+  }
+}
+
+function extentOf(nodes, pidx) { // width and height of nodes' content
+	if (nodes.length < 1) return {x:0, y:0, w:0, h:0};
+  
+	let xmax = 0, ymax = 0;
+  let xmin = Number.MAX_SAFE_INTEGER, ymin = Number.MAX_SAFE_INTEGER;
+  
+  for (let i=0; i<nodes.length; i++) {
+  	let n = nodes[i];
+    if (n.p != pidx) continue;
+  	let l=n.x, r=n.x+n.w;
+    let t=n.y, b=n.y+n.h;
+    xmax = Math.max(xmax,l,r);
+    ymax = Math.max(ymax,t,b);
+    xmin = Math.min(xmin,l,r);
+    ymin = Math.min(ymin,t,b);
+  }
+  
+  return {x:xmin, y:ymin, w:xmax-xmin, h:ymax-ymin};
+}
+
+function measureContainer(chain, cli) {
+	if (cli < 1) return;
+  if (cli >= chain.length) return;
+  
+  let type = chain[cli-1].type;
+  if (type.w > 0 && type.h > 0) return; // not flexible
+  
+	let pidx = lastNode(chain[cli]).p; // parent index
+  let nodes = chain[cli].nodes;
+  let size = extentOf(nodes, pidx);
+  
+  // only update the flexible parts
+  if (type.w <= 0) chain[cli-1].nodes[pidx].w = size.w;
+  if (type.h <= 0) chain[cli-1].nodes[pidx].h = size.h;
+}
+
+function fitsIn(chain, node) {
+	// Always try to add content at the end of the chain.
+	// Walk up the chain. Ignore flexible sized nodes
+  // If any non-flexible node can't contain this
+  // item, return false.
+  let l=node.x, r=node.x+node.w;
+  let t=node.y, b=node.y+node.h;
+  
+  let pidx = node.p;
+  
+  for (let i = chain.length - 2; i >= 0; i--) {
+  	let type = chain[i].type;
+    let pnode = chain[i].nodes[pidx];
+    pidx = pnode.p;
+    
+    if (type.w == 0 && type.h == 0) continue;
+    
+  	let cl=pnode.x, cr=pnode.x+pnode.w;
+  	let ct=pnode.y, cb=pnode.y+pnode.h;
+    
+  	if (type.w > 0) {
+    	if (l < cl || r > cr) return false;
+    }
+  	if (type.h > 0) {
+    	if (t < ct || b > cb) return false;
+    }
+  }
+  return true;
+}
+
+function commit(chain) { // remove 'pending' tag from nodes
+	for (let i = 0; i < chain.length; i++) {
+  	let nodes = chain[i].nodes;
+  	for (let j = nodes.length-1; j >= 0; j--) {
+    	if (nodes[j].pending) delete nodes[j].pending;
+      else break;
+    }
+  }
+}
+
+function rollback(chain) { // delete any nodes with the 'pending' tag
+	for (let i = 0; i < chain.length; i++) {
+  	let nodes = chain[i].nodes;
+  	while (nodes[nodes.length-1].pending) {
+    	nodes.pop();
+    }
+  }
+}
+
+// return a new node to extend
+function joinNode(chain, idx, item) {
+		let chainItem = chain[idx];
+    let p = 0; // parent node index in next chain level up
+    let op = 0; // earlier sibling's parent
+    
+    if (idx > 0) {
+    	p = chain[idx-1].nodes.length - 1;
+      op = lastNode(chainItem).p;
+    }
+    
+  	let n = {
+    	w:item.w, h:item.h, p: p
+    };
+    
+    // if we are continuing in a parent, join to our sibling
+    // if we are the first, position based on parent
+    if (p == op){
+    	relpos(chainItem.type.prev, chainItem.type.next, lastNode(chainItem), n);
+    } else {
+    	if (idx > 0) {
+        relpos(chain[idx-1].type.prev, chain[idx].type.prev, lastNode(chain[idx-1]), n);
+      } else {
+        n.x=0; n.y=0;
+      }
+    }
+    return n;
+}
+
+function tryBreak(chain, level) { // create new container nodes, mark with 'pending'
+	if (level < 1) return; // not really breaking
+  let cli = chain.length - (level + 1);
+  if (cli < 1) return; // can't extend root
+  
+  let item = chain[cli];
+  let pidx = chain[cli-1].nodes.length - 1;
+  
+  for (let i = chain.length - 1; i >= cli; i--) {
+  	measureContainer(chain, i);
+  }
+  
+  // TODO: if we're breaking a 'glue' item, we should take our siblings with us
+  //       or possibly, don't really break -- move the existing node instead
+  
+  // go up the break level and start a new node
+ 	let newItem = {
+  	w:item.type.w, h:item.type.h, p:pidx, pending:true
+  };
+  relpos(item.type.prev, item.type.next, lastNode(item), newItem);
+  item.nodes.push(newItem);
+  
+  // continue back DOWN the chain building new nodes
+  for (let i = cli + 1; i < chain.length - 1; i++) {
+  	pidx = chain[i-1].nodes.length - 1;
+  	let cascade = {
+      w:chain[i].type.w, h:chain[i].type.h, p:pidx, pending:true
+    };
+    relpos(chain[i-1].type.prev, chain[i].type.prev, lastNode(chain[i-1]), cascade);
+    // initial position is prev->prev
+  	chain[i].nodes.push(cascade);
+  }
+}
+
+function run(chain, input) {
+  buildInitialChain(chain);
+  
+  // Run through the input items
+  let cli = chain.length - 1; // index of end of chain
+  while (input.length > 0) {
+  	let item = input.shift();
+    
+  	if (item.brk > 0) { // these should always ignore glue
+    	tryBreak(chain, item.brk);
+      commit(chain);
+      continue;
+    }
+    
+    // TODO: Respect the 'glue' setting (e.g. keeping glyphs together in words).
+    //       Doing 'glue' joins may be simplest by filling up a parent container
+    //       without adding to the chain, then add when we hit a break.
+    
+    let found = false;
+    for(let b = 0; b <= chain.length; b++) { // walk up the break list, trying to find a fit
+      tryBreak(chain, b);
+
+      let next = joinNode(chain, cli, item);
+      next.chr = item.chr;
+
+      if (fitsIn(chain, next)) {
+        chain[cli].nodes.push(next);
+        commit(chain);
+        found = true;
+        break;
+      }
+      rollback(chain);
+    }
+    
+    if (!found) {
+      log("Ran out of space");
+      break;
+    }
+    
+  } // end of content loop
+  
+  
+	// this isn't really needed, but it makes drawing
+  // the container boxes more accurate
+  for (let i = chain.length - 1; i >= 0; i--) {
+    measureContainer(chain, i);
+  }
+  
+  return chain;
+}
+
+// EXECUTION
+let before = new Date();
+let result = run(buildContentChain(exampleLayout), breakStringToInput(exampleInput));
+let after = new Date();
+log((after - before)+"ms");
+
+renderChain(result);
+

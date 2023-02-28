@@ -1,0 +1,491 @@
+const diagramStyles = '.lineText {  font: 0.5em sans-serif;}' +
+    '.boxText {  font: 0.75em sans-serif; display:table-cell;}' +
+    '.boxTextSmall {  font: 0.25em sans-serif; display:table-cell;}' +
+    'textPath {  text-anchor: middle;}' +
+    '.line {  fill: none;  stroke-width: 1px;  stroke: #888;}' +
+    '.arrowHead {  fill: #888;}' +
+    'rect {  fill: #eef;  stroke-width: 1px;  stroke: #888;}';
+
+function warn(msg, cmd) {
+    console.log(msg + ": " + (cmd || []).join(' '));
+    return "";
+}
+
+function clean(msg) {
+    return msg.replace(/[&]/g, '&amp;').replace(/[<]/g, '&lt;').replace(/[>]/g, '&gt;').replace(/\\n/g, '<br/>');
+}
+
+function projectPoint(v1, v2, p) {
+    const e1 = {x: (v2.x - v1.x), y: (v2.y - v1.y)};
+    const e2 = {x: (p.x - v1.x), y: (p.y - v1.y)};
+
+    const dot = (e1.x * e2.x) + (e1.y * e2.y);  // get dot product of e1, e2
+    let len2 = e1.x * e1.x + e1.y * e1.y;
+    if (len2 === 0) len2 = 1;
+
+    return {
+        x: (v1.x + (dot * e1.x) / len2),
+        y: (v1.y + (dot * e1.y) / len2)
+    };
+}
+
+function addPin(cmdArray, pins, state) {
+    if (cmdArray.length < 3) return warn("Pin command too short", cmdArray);
+
+    const pinName = cmdArray.shift();
+    const xpos = cmdArray.shift() - 0;
+    const ypos = cmdArray.shift() - 0;
+    pins[pinName] = {
+        x: xpos + state.translate.x,
+        y: ypos + state.translate.y
+    };
+
+    return ""; // no markup
+}
+
+function translate(cmdArray, state) {
+    if (cmdArray.length < 2) return warn("Translate command too short", cmdArray);
+    state.translate.x = cmdArray.shift() - 0;
+    state.translate.y = cmdArray.shift() - 0;
+}
+
+function movePin(cmdArray, pins) {
+    if (cmdArray.length < 3) return warn("Move command too short", cmdArray);
+
+    const xoffs = cmdArray.shift() - 0;
+    const yoffs = cmdArray.shift() - 0;
+
+    for (let pinName of cmdArray) {
+        if (!pins[pinName]) {
+            warn("Can't move unknown pin '" + pinName + "'");
+            continue;
+        }
+        pins[pinName].x += xoffs;
+        pins[pinName].y += yoffs;
+    }
+
+    return ""; // no markup
+}
+
+function projectPin(cmdArray, pins) {
+    if (cmdArray.length < 4) return warn("Project command too short", cmdArray);
+
+    const newPinName = cmdArray.shift();
+
+    const pin1 = cmdArray.shift();
+    const pin2 = cmdArray.shift();
+    const pinX = cmdArray.shift();
+    if (!pins[pin1]) return warn("Project -- pin not defined '" + pin1 + "'", cmdArray);
+    if (!pins[pin2]) return warn("Project -- pin not defined '" + pin2 + "'", cmdArray);
+    if (!pins[pinX]) return warn("Project -- pin not defined '" + pinX + "'", cmdArray);
+
+    pins[newPinName] = projectPoint(pins[pin1], pins[pin2], pins[pinX]);
+
+    return ""; // no markup
+}
+
+function pinAtCorner(cmdArray, pins) {
+    if (cmdArray.length < 3) return warn("Corner command too short", cmdArray);
+
+    const newPinName = cmdArray.shift();
+    const pin1 = cmdArray.shift();
+    const pin2 = cmdArray.shift();
+
+    if (!pins[pin1]) return warn("Corner -- pin not defined '" + pin1 + "'", cmdArray);
+    if (!pins[pin2]) return warn("Corner -- pin not defined '" + pin2 + "'", cmdArray);
+    pins[newPinName] = {
+        x: pins[pin1].x,
+        y: pins[pin2].y
+    };
+
+    return ""; // no markup
+}
+
+function moveToPin(useFirst, centre, cmdArray, pins) {
+    if (cmdArray.length < 2) return warn("Pin group move to has no elements", cmdArray);
+    let xoffs = Number.MAX_SAFE_INTEGER;
+    let yoffs = Number.MAX_SAFE_INTEGER;
+    let xmax = Number.MIN_SAFE_INTEGER;
+    let ymax = Number.MIN_SAFE_INTEGER;
+    let xmin = Number.MAX_SAFE_INTEGER;
+    let ymin = Number.MAX_SAFE_INTEGER;
+
+    const basePinName = cmdArray.shift();
+    if (!pins[basePinName]) return warn("MoveTo -- base pin not defined '" + basePinName + "'", cmdArray);
+
+    let base = pins[basePinName];
+    let pinName = "";
+
+    // find extents
+    for (pinName of cmdArray) {
+        if (!pins[pinName]) {
+            warn("Can't reset unknown pin '" + pinName + "'");
+            continue;
+        }
+        xmin = Math.min(xmin, pins[pinName].x);
+        ymin = Math.min(ymin, pins[pinName].y);
+        xmax = Math.max(xmax, pins[pinName].x);
+        ymax = Math.max(ymax, pins[pinName].y);
+    }
+
+    if (useFirst) {
+        const relPinName = cmdArray.shift();
+        if (!pins[relPinName]) return warn("MoveTo -- relative pin not defined '" + relPinName + "'", cmdArray);
+
+        xoffs = pins[relPinName].x - base.x;
+        yoffs = pins[relPinName].y - base.y;
+    } else {
+        xoffs = xmin - base.x;
+        yoffs = ymin - base.y;
+    }
+
+    if (centre) {
+        xoffs += (xmax - xmin) / 2;
+        yoffs += (ymax - ymin) / 2;
+    }
+
+    // apply offsets
+    for (pinName of cmdArray) {
+        pins[pinName].x -= xoffs;
+        pins[pinName].y -= yoffs;
+    }
+
+    return ""; // no markup
+}
+
+function resetPinsToOrigin(cmdArray, pins) {
+    if (cmdArray.length < 1) return warn("Pin group reset has no element", cmdArray);
+    let xoffs = Number.MAX_SAFE_INTEGER;
+    let yoffs = Number.MAX_SAFE_INTEGER;
+
+    let pinName = "";
+    
+    // find extents
+    for (pinName of cmdArray) {
+        if (!pins[pinName]) {
+            warn("Can't reset unknown pin '" + pinName + "'");
+            continue;
+        }
+        xoffs = Math.min(xoffs, pins[pinName].x);
+        yoffs = Math.min(yoffs, pins[pinName].y);
+    }
+
+    // apply offsets
+    for (pinName of cmdArray) {
+        pins[pinName].x -= xoffs;
+        pins[pinName].y -= yoffs;
+    }
+
+    return ""; // no markup
+}
+
+function splitPin(cmdArray, pins) {
+    if (cmdArray.length < 3) return warn("Split command too short", cmdArray);
+
+    const newPinName = cmdArray.shift();
+    const pin1 = cmdArray.shift();
+    const pin2 = cmdArray.shift();
+
+    if (!pins[pin1]) return warn("Split -- pin not defined '" + pin1 + "'", cmdArray);
+    if (!pins[pin2]) return warn("Split -- pin not defined '" + pin2 + "'", cmdArray);
+    pins[newPinName] = {
+        x: (pins[pin1].x + pins[pin2].x) / 2,
+        y: (pins[pin1].y + pins[pin2].y) / 2
+    };
+
+    return ""; // no markup
+}
+
+function pinByOffset(cmdArray, pins) {
+    if (cmdArray.length < 4) return warn("Offset command too short", cmdArray);
+
+    const newPinName = cmdArray.shift();
+    const srcPin = cmdArray.shift();
+    if (!pins[srcPin]) return warn("Offset -- pin not defined '" + srcPin + "'", cmdArray);
+    const xoffs = cmdArray.shift() - 0;
+    const yoffs = cmdArray.shift() - 0;
+    pins[newPinName] = {
+        x: (pins[srcPin].x + xoffs),
+        y: (pins[srcPin].y + yoffs)
+    };
+
+    return ""; // no markup
+}
+
+function drawBox(splitCells, cmdArray, pins, state, small) {
+    if (cmdArray.length < 2) return warn("Box command too short", cmdArray);
+
+    let cols = 1;
+    if (splitCells) cols = cmdArray.shift() - 0;
+    if (cols < 1) return warn("Table -- table columns not valid: '" + cols + "'", cmdArray);
+
+    const pin1 = cmdArray.shift();
+    const pin2 = cmdArray.shift();
+    let text = clean(cmdArray.join(' '));
+
+    text = (splitCells) ? (text.split('|')) : ([text]);
+
+    if (!pins[pin1]) return warn("Box -- pin not defined '" + pin1 + "'", cmdArray);
+    if (!pins[pin2]) return warn("Box -- pin not defined '" + pin2 + "'", cmdArray);
+    const p1 = pins[pin1];
+    const p2 = pins[pin2];
+
+    const top = Math.min(p1.y, p2.y),
+        left = Math.min(p1.x, p2.x);
+    const right = Math.max(p1.x, p2.x),
+        bottom = Math.max(p1.y, p2.y);
+    const w = right - left;
+    const h = bottom - top;
+
+    const style = (state.boxColor) ? ' style="fill: #' + state.boxColor + '" ' : '';
+
+    let result = '<rect x="' + left + '" y="' + top + '" width="' + w + '" height="' + h + '"' + style + '/>';
+
+    if (text.length < 1) return result;
+
+    // This horrendous mess is the only reliable way I found to get
+    // centred, wrapping text to look nice
+    result += '<foreignObject x="' + (left) + '" y="' + (top) + '" width="' + (w) + '" height="' + (h) + '" transform="translate(0,0)">' +
+        '<xhtml:div style="display: table; height: ' + h + 'px; margin: auto; padding: 0 1px 0 1px;">';
+
+    const txtClass = small ? "boxTextSmall" : "boxText";
+    const colwidth = w / cols;
+    let firstrow = (cols > 1);
+    while (text.length > 0) {
+        let remCols = cols;
+        result += '<xhtml:div style="display: table-row">';
+        while (text.length > 0 && remCols-- > 0) {
+            let edge = (remCols > 0) ? "border-right:thin solid rgb(0,0,0, .4); " : "";
+            if (cols > 1) edge += "padding: 0 .3em 0 .3em; ";
+            if (firstrow) edge += "border-bottom:thin solid rgb(0,0,0, .4); ";
+            result += `<xhtml:div style="display: table-cell; ${edge}vertical-align: middle;">` +
+                `<xhtml:div style="color:black; text-align:center; width: ${colwidth} px;" class="${txtClass}">${text.shift()}</xhtml:div>` +
+                '</xhtml:div>';
+        }
+        firstrow = false;
+        result += '</xhtml:div>';
+    }
+    result += '</xhtml:div>' +
+        '</foreignObject>';
+
+    return result;
+}
+
+function drawAutoBox(splitCells, cmdArray, pins, state) {
+    if (!cmdArray) return warn("AutoBox invalid commands", cmdArray);
+    if (cmdArray.length < 5) return warn("AutoBox command too short", cmdArray);
+
+    let cols = 1;
+    if (splitCells) cols = cmdArray.shift() - 0;
+    if (cols < 1) return warn("AutoTable -- table columns not valid: '" + cols + "'", cmdArray);
+
+    const pinBaseName = cmdArray.shift();
+    const ab_x = cmdArray.shift() - 0;
+    const ab_y = cmdArray.shift() - 0;
+    const width = cmdArray.shift() - 0;
+    const height = cmdArray.shift() - 0;
+    if (width <= 0) return warn("AutoBox -- invalid width: '" + width + "'", cmdArray);
+    if (height <= 0) return warn("AutoBox -- invalid height: '" + height + "'", cmdArray);
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    //var text = clean(cmdArray.join(' ')); // leave the text in place
+    // create pins, rebuild the command array, then call regular box
+    addPin([pinBaseName + "_tl", ab_x, ab_y], pins, state);
+    addPin([pinBaseName + "_t", ab_x + halfWidth, ab_y], pins, state);
+    addPin([pinBaseName + "_tr", ab_x + width, ab_y], pins, state);
+
+    addPin([pinBaseName + "_l", ab_x, ab_y + halfHeight], pins, state);
+    addPin([pinBaseName + "_r", ab_x + width, ab_y + halfHeight], pins, state);
+
+    addPin([pinBaseName + "_bl", ab_x, ab_y + height], pins, state);
+    addPin([pinBaseName + "_b", ab_x + halfWidth, ab_y + height], pins, state);
+    addPin([pinBaseName + "_br", ab_x + width, ab_y + height], pins, state);
+
+    // Box pin1 pin2 [text...]
+    cmdArray.unshift(pinBaseName + "_br");
+    cmdArray.unshift(pinBaseName + "_tl");
+    if (splitCells) cmdArray.unshift(cols + '');
+    return drawBox(splitCells, cmdArray, pins, state);
+}
+
+let globalLineNum = 1;
+
+function drawLine(useArrow, flipText, cmdArray, pins, state) {
+    if (cmdArray.length < 2) return warn("Line command too short", cmdArray);
+
+    const pin1 = cmdArray.shift();
+    const pin2 = cmdArray.shift();
+    const text = clean(cmdArray.join(' '));
+
+    if (!pins[pin1]) return warn("Pin not defined '" + pin1 + "'", cmdArray);
+    if (!pins[pin2]) return warn("Pin not defined '" + pin2 + "'", cmdArray);
+    let p1 = pins[pin1];
+    let p2 = pins[pin2];
+
+    let t;
+    
+    // don't draw lines upside-down
+    let r2l = p1.x > p2.x;
+    if (r2l) {
+        t = p1;
+        p1 = p2;
+        p2 = {
+            x: t.x,
+            y: t.y
+        };
+    }
+
+    let textTransform = "";
+    if (flipText) { // ok, force lines to be upside-down
+        r2l = !r2l;
+        t = p1;
+        p1 = p2;
+        p2 = {
+            x: t.x,
+            y: t.y
+        };
+        textTransform = 'style="transform-origin:center;transform-box:fill-box;transform:rotateZ(180deg);"';
+    }
+
+    const pathStyle = (state.lineColor) ? ' style="stroke:#' + state.lineColor + '" ' : '';
+
+    const lineId = "curve_" + globalLineNum;
+    globalLineNum++;
+    let dx = "";
+
+    let anchor = "";
+    if (useArrow) {
+        dx = r2l ? 'dx="5" ' : 'dx="-5" ';
+        anchor = (r2l) ? (' marker-start="url(#arrow_r2l)" ') : (' marker-end="url(#arrow_l2r)" ');
+    }
+    let result = '<path ' + anchor + pathStyle + ' class="line" id="' + lineId + '" d="M' + p1.x + ',' + p1.y + 'L' + p2.x + ',' + p2.y + '" />';
+
+    if (text.length > 0) {
+    	  let textx=text.replace(/_/g, " &nbsp;");
+        result += '<text dy="-2" ' + dx + textTransform + ' ><textPath xlink:href="#' + lineId + '" startOffset="50%" class="lineText">' + textx + '</textPath></text>';
+    }
+
+    return result;
+}
+
+function setFillColor(cmdArray, state) {
+    state.boxColor = (cmdArray) ? (cmdArray[0]) : null;
+    return "";
+}
+
+function setLineColor(cmdArray, state) {
+    state.lineColor = (cmdArray) ? (cmdArray[0]) : null;
+    return "";
+}
+
+function handleCommand(cmdStr, pins, state) {
+    const command = cmdStr.split(/\s+/);
+    if (command.length < 1) return ""; // invalid
+    const cmdName = command.shift().toLowerCase();
+
+    switch (cmdName) {
+        case "#":
+            return ""; // comment
+        case "pin":
+            return addPin(command, pins, state);
+        case "split":
+            return splitPin(command, pins);
+        case "offset":
+            return pinByOffset(command, pins);
+        case "move":
+            return movePin(command, pins);
+        case "moveto":
+            return moveToPin(false, false, command, pins);
+        case "centre":
+        case "center":
+            return moveToPin(false, true, command, pins);
+        case "moveover":
+            return moveToPin(true, false, command, pins);
+        case "reset":
+            return resetPinsToOrigin(command, pins);
+        case "corner":
+            return pinAtCorner(command, pins);
+        case "autobox":
+            return drawAutoBox(false, command, pins, state);
+        case "autotable":
+            return drawAutoBox(true, command, pins, state);
+        case "box":
+            return drawBox(false, command, pins, state, false);
+        case "smallbox":
+            return drawBox(false, command, pins, state, true);
+        case "table":
+            return drawBox(true, command, pins, state);
+        case "line":
+            return drawLine(false, false, command, pins, state);
+        case "arrow":
+            return drawLine(true, false, command, pins, state);
+        case "flipline":
+            return drawLine(false, true, command, pins, state);
+        case "fliparrow":
+            return drawLine(true, true, command, pins, state);
+        case "fill":
+            return setFillColor(command, state);
+        case "stroke":
+            return setLineColor(command, state);
+        case "clearfill":
+            return setFillColor([], state);
+        case "clearstroke":
+            return setLineColor([], state);
+        case "project":
+            return projectPin(command, pins);
+        case "translate":
+        case "group":
+            return translate(command, state);
+        default:
+            return ""; // invalid
+    }
+}
+
+function processElement(elem) {
+    const src = elem.innerHTML; // 'innerText' does not preserve newlines
+    // we should be able to scale based on the diagram. For now, fixed size.
+    let width = 100;
+    let height = 100;
+
+    let content = "";
+    const pins = {};
+    const state = {translate: {x: 0, y: 0}};
+    const lines = src.split(/\s*\n+\s*/); // split lines, ignoring blank lines, leading and trailing whitespace.
+
+    for (let line of lines) {
+        const result = handleCommand(line, pins, state);
+        if (result && result.length > 0) content += result + "\r\n";
+    }
+
+    // find extents
+    for (let pin in pins) {
+        width = Math.max(width, pins[pin].x || 0);
+        height = Math.max(height, pins[pin].y || 0);
+    }
+    // add some margin
+    width += 20;
+    height += 20;
+
+    // insert contents into the template
+    // noinspection XmlUnusedNamespaceDeclaration
+    elem.innerHTML = 
+`<svg xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 ${width} ${height}">
+<defs><style type="text/css"><![CDATA[${diagramStyles}]]></style></defs>
+${content}
+<defs>
+<marker id="arrow_l2r" viewBox="0 0 10 10" refX="10" refY="5" markerUnits="strokeWidth" markerWidth="10" markerHeight="10" orient="auto" class="arrowHead">
+<path d="M 0 0 L 10 5 L 0 10 z"></path>
+</marker>
+<marker id="arrow_r2l" viewBox="0 0 10 10" refX="0" refY="5" markerUnits="strokeWidth" markerWidth="10" markerHeight="10" orient="auto" class="arrowHead">
+<path d="M 10 0 L 0 5 L 10 10 z"></path>
+</marker>
+</defs>
+</svg>`;
+}
+
+const everything = document.getElementsByClassName("diagram");
+for (let elem of everything) {
+    if (!elem.id) continue;
+    processElement(elem);
+}

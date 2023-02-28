@@ -1,0 +1,8 @@
+<p>
+This is a demonstration of using a simple heuristic to compact entropy in a dataset.
+We are aiming to have the highest probability in packed into the smallest number of code words.
+</p>
+<p>
+This particular method is very simple and fast, but can't represent pairings (such as 'th', 'e ') or any more complex patterns like that.
+</p>
+<span style="word-wrap:break-word" id="content"></span>

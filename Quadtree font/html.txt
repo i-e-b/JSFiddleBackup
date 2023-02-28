@@ -1,0 +1,191 @@
+<h1>Binary quad-tree fonts.</h1>
+<h2>Concept</h2>
+
+Rather than having bitmap fonts that represent exactly one rendering size, or outline fonts that describe an ideal that must be interpreted down to a representation; we propose a compact multi-resolution image format for rendering glyphs.
+
+<h3>Existing formats<h3>
+<h4>Bitmap</h4>
+A simple image format that stores each glyph as an grid of pixels
+<ul>
+<li>+ Fast to render</li>
+<li>+ Designing fonts is very simple</li>
+<li>- Does not support antialiasing (except with pixelmap or supersampling, which increases size)</li>
+<li>- Does not support scaling</li>
+</ul>
+
+<h4>Outline</h4>
+A set of curves for each glyph, which are rendered to pixels as required
+<ul>
+<li>+ Can represent very detailed glyphs in small storage space</li>
+<li>+ Supports any kind of anti-aliasing in the render</li>
+<li>+ Scaling is trivial</li>
+<li>- Rendering is complex</li>
+<li>- Rendering at small sizes is very complex</li>
+<li>- Designing professional quality fonts is insanely complex</li>
+</ul>
+
+<h4>Distance map</h4>
+A hybrid of outline and bitmap. A grid of signed distances from font edge are stored and rendered to pixels as required
+
+<ul>
+<li>+ Can represent very detailed glyphs in small storage space</li>
+<li>+ Supports super-sample anti-aliasing in the render</li>
+<li>+ Rendering is simple</li>
+<li>~ Scaling is not too complex</li>
+<li>- Details tend to be lost at large scale</li>
+<li>- Rendering at small sizes loses detail</li>
+</ul>
+
+<h3>Our format</h3>
+We start with a low resolution bitmap, and progressively refine it until we reach a resolution that cleanly represents the character forms we want.
+<ul>
+<li>+ Scaling is trivial</li>
+<li>+ Rendering at small sizes is perfect</li>
+<li>+ Supports alpha-channel anti-aliasing in the render, with no extra memory</li>
+<li>- Large scale details run out of resolution eventually</li>
+<li>- Odd sizes of font will need more complex scaling?</li>
+</ul>
+
+<h3>The format</h3>
+Each glyph has a 64-bit header giving it's size and offsets, then a repeating sequence of 2 bits for the image.
+"X%" means the value divided by 127.0 as a real number
+<h4>Header</h4>
+<table><tbody>
+<tr><td>Glyph Width</td><td>8 bits (0-255)</td><td>X% of 'font size' for the displayed image width</td></tr>
+<tr><td>Glyph Height</td><td>8 bits (0-255)</td><td>X% of 'font size' for the displayed image height</td></tr>
+
+<tr><td>X offset</td><td>8 bits (-127-127)</td><td>X% of 'font size' that the image should be shifted to the right of the base point</td></tr>
+<tr><td>Y offset</td><td>8 bits (-127-127)</td><td>X% of 'font size' that the image should be shifted up from the base point</td></tr>
+
+
+<tr><td>X advance</td><td>8 bits (-127-127)</td><td>X% of 'font size' that the base point should be shifted to the right of the previous base point</td></tr>
+<tr><td>Y advance</td><td>8 bits (-127-127)</td><td>X% of 'font size' that the base point should be shifted up from the previous base point</td></tr>
+
+<tr><td>Y advance</td><td>16 bits (0-65535)</td><td>Number of <b>bytes</b> in the image</td></tr>
+</tbody></table>
+
+<h4>Image</h4>
+<table><tbody>
+<tr><td>0</td><td>1</td></tr>
+<tr><td>Filled?</td><td>Continues?</td></tr>
+</tbody></table>
+
+<h3>The Process</h3>
+<p>We start with a block that covers the entire glyph width and height. The first bit says if this 1x1 image is filled (<tt>1</tt>) or empty (<tt>0</tt>). If the next bit is set, this block is subdivided in the next level of detail. Otherwise we stop.</p>
+
+<p>Each level of detail is completed before moving on to the next, so we get all the 2x2 pixels, then all the 4x4 pixels, all the 8x8 pixels, etc. When a block is not subdivided in the next level of detail, we get no more data for it in the stream (so we have to keep track of what needs dividing)</p>
+<p>We can stop when we have enough detail to fill in the pixels accurately. We can continue to get antialiasing</p>
+
+
+<h3>Example</h3>
+A lowercase letter 'a'. We don't use (filled,stop) in this little demo.
+
+<table><tbody>
+<tr><td class="f">[11] - filled, continue</td><td class="e">[01] - empty, continue</td><td class="x">[00] - empty, stop</td><td class="b">[10] - filled, stop</td></tr>
+</tbody></table>
+
+
+<table class="img"><thead><tr><th>1x1</th><tr></thead><tbody>
+<tr><td class="f"/></tr>
+</tbody></table>
+
+
+
+<table class="img"><thead><tr><th colspan=2>2x2</th><tr></thead><tbody>
+<tr><td class="f"/><td class="e"/></tr>
+<tr><td class="f"/><td class="f"/></tr>
+</tbody></table>
+
+
+<table class="img"><thead><tr><th colspan=4>4x4</th><tr></thead><tbody>
+<tr><td class="f"/><td class="f"/><td class="f"/><td class="x"/></tr>
+<tr><td class="f"/><td class="e"/><td class="f"/><td class="x"/></tr>
+<tr><td class="f"/><td class="e"/><td class="f"/><td class="x"/></tr>
+<tr><td class="f"/><td class="f"/><td class="f"/><td class="f"/></tr>
+</tbody></table>
+
+<table class="img"><thead><tr><th colspan=8>8x8</th><tr></thead><tbody>
+<tr><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td rowspan=2 colspan=2 class="x"/></tr>
+<tr><td class="f"/><td class="f"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/></tr>
+<tr><td class="x"/><td class="x"/><td class="x"/><td class="x"/><td class="f"/><td class="f"/><td rowspan=2 colspan=2  class="x"/></tr>
+<tr><td class="x"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/></tr>
+<tr><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td class="f"/><td class="f"/><td rowspan=2 colspan=2  class="x"/></tr>
+<tr><td class="f"/><td class="f"/><td class="x"/><td class="e"/><td class="f"/><td class="f"/></tr>
+<tr><td class="f"/><td class="f"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td rowspan=2 colspan=2  class="x"/></tr>
+<tr><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/></tr>
+
+<tr class="s"><td/><td/><td/><td/><td/><td /><td/><td/></tr>
+</tbody></table>
+
+
+<table class="img"><thead><tr><th colspan=16>16x16</th><tr></thead><tbody>
+<tr><td class="x"/><td class="x"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td class="x"/><td class="x"/><td rowspan=4 colspan=4 class="x"/></tr>
+<tr><td class="x"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td class="x"/></tr>
+<tr><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="e"/></tr>
+<tr><td class="e"/><td class="f"/><td class="f"/><td class="e"/><td class="e"/><td class="e"/><td class="e"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/></tr>
+
+<tr><td rowspan=2 colspan=2 class="x"/><td rowspan=2 colspan=2 class="x"/><td rowspan=2 colspan=2 class="x"/><td rowspan=2 colspan=2 class="x"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td rowspan=4 colspan=4 class="x"/></tr>
+<tr><td class="e"/><td class="f"/><td class="f"/><td class="f"/></tr>
+<tr><td rowspan=2 colspan=2 class="x"/><td class="e"/><td class="e"/><td class="e"/><td class="e"/><td class="e"/><td class="e"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/></tr>
+<tr><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/></tr>
+
+<tr><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td rowspan=4 colspan=4 class="x"/></tr>
+<tr><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td class="x"/><td class="x"/><td class="x"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/></tr>
+<tr><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td rowspan=2 colspan=2 class="x"/><td class="x"/><td class="x"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/></tr>
+<tr><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td class="x"/><td class="x"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/></tr>
+
+<tr><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td class="x"/><td class="x"/><td class="x"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td rowspan=4 colspan=4 class="x"/></tr>
+<tr><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/></tr>
+<tr><td class="e"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/></tr>
+<tr><td class="x"/><td class="e"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/><td class="f"/><td class="e"/><td class="e"/><td class="f"/><td class="f"/><td class="f"/></tr>
+
+
+<tr class="s"><td/><td/><td/><td/><td/><td /><td/><td/><td/><td/><td/><td/><td/><td /><td/><td/></tr>
+</tbody></table>
+
+<br style="clear:both"/>
+<p>The data stream would then look like</p>
+<pre>
+11
+
+11 01
+11 11
+
+11 11 11 00
+11 01 11 00
+11 01 11 00
+11 11 11 11
+
+01 11 11 11 11 01 .. ..
+11 11 01 11 11 11 .. ..
+00 00 00 00 11 11 .. ..
+00 11 11 11 11 11 .. ..
+11 11 11 01 11 11 .. ..
+11 11 00 01 11 11 .. ..
+11 11 01 11 11 11 .. ..
+01 11 11 11 11 11 .. ..
+
+00 00 01 11 11 11 11 11 11 01 00 00
+00 01 11 11 11 11 11 11 11 11 01 00
+01 11 11 11 11 11 11 11 11 11 11 01
+                        01 11 11 11
+                        01 11 11 11
+      01 01 01 01 01 01 01 11 11 11
+      11 11 11 11 11 11 11 11 11 11
+01 11 11 11 11 11 11 11 11 11 11 11
+11 11 11 11 01 00 00 00 01 11 11 11
+11 11 11 01       00 00 01 11 11 11
+11 11 11 01       00 00 01 11 11 11
+11 11 11 01 00 00 00 01 11 11 11 11
+01 11 11 11 11 11 11 11 11 11 11 11
+01 01 11 11 11 11 11 11 11 11 11 11
+00 01 01 11 11 11 11 01 01 11 11 11
+</pre>
+For a total of 225 codes (450 bits, 57 bytes). A raw 16x16 image would be 256 bits (32 bytes)
+
+
+
+
+
+
+

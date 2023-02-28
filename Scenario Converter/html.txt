@@ -1,0 +1,23 @@
+FROM STORY:<input type="text" id="storyId" value="1234"/>
+<br/>
+<textarea id="input" rows="20" cols="100">
+<![CDATA[
+Scenario 1: If I'm not logged of type+<T> in I can't create claimants
+Given I am not logged in
+When I try to submit a "new" claimant
+Then a claimant is not created
+And the date is formatted DD/MM/YYYY
+And I am given an error message, with no additional details & name
+
+Scenario 6a: New claimants mailing address must be the correct length
+Scenario 6b: New claimants fiscal address must be the correct length
+Given I am logged in as a tenant user
+When I try to create a claimant with a string length <= 3 or >255 in a mandatory text area
+Then I cannot create a claimant
+And I am given an error message informing me of the length requirements for the text area
+]]>
+</textarea>
+<br/>
+<a href="javascript:convert()">Convert</a>
+<br/>to code:<br/>
+<textarea id="output" rows="20" cols="100"></textarea>

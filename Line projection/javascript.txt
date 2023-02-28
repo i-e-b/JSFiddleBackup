@@ -1,0 +1,23 @@
+// return the point `p` projected onto the line v1->v2
+function projectPoint(v1, v2, p)
+{
+  var e1 = {x : (v2.x - v1.x), y: (v2.y - v1.y)};
+  var e2 = {x : (p.x - v1.x), y: (p.y - v1.y)};
+  
+  // get dot product of e1, e2
+  var val = (e1.x * e2.x) + (e1.y * e2.y);
+  // get squared length of e1
+  var len2 = e1.x * e1.x + e1.y * e1.y;
+  
+  var pp = {x: (v1.x + (val * e1.x) / len2),
+            y: (v1.y + (val * e1.y) / len2)
+            };
+  return pp;
+}
+
+var pv1 = {x:0, y:0};
+var pv2 = {x:1, y:1};
+var pvp = {x:0, y:1};
+
+document.getElementById("outp").innerText = JSON.stringify(projectPoint(pv1, pv2, pvp));
+// should be 0.5,0.5

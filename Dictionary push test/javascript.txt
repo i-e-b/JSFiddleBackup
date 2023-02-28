@@ -1,0 +1,89 @@
+//var dict = " abcdefghijklmnopqrstuvwxyz".split('');
+//var dict = [" ","e","t","a","s","o","h","r","n","i","d","u","l","m","f","c","p","v","w","y","g","b","k","q","j","x","z"]; // the plain alphabet run until stable.
+
+var dict = [" ","e","t","a","o","i","n","s","r","h","l","d",
+"c","u","m","f","g","p","w","y","b","v","k","j","q","x","z"]; // aproximate English distribution
+
+
+var startingDict = JSON.parse(JSON.stringify(dict));
+
+var corpus = ("To be or not to be that is the question "+
+             "Whether tis nobler in the mind to suffer "+
+             "The slings and arrows of outrageous fortune "+
+             "Or to take Arms against a Sea of troubles "+
+             "And by opposing end them to die to sleep "+
+             "No more and by a sleep to say we end "+
+             "the heartache and the thousand natural shocks "+
+             "that Flesh is heir to Tis a consummation "+
+             "devoutly to be wished To die to sleep "+
+             "To sleep perchance to Dream aye theres the rub "+
+             "for in that sleep of death what dreams may come "+
+             "when we have shuffled off this mortal coil "+
+             "must give us pause").toLowerCase();
+// BWT of the above
+/*var corpus = "stysseseedmoooddlyafnoootegtbsteesrrhtseosldpsrpsadyeefspeeoaleotoaoeoosendnssrddefeortymdepepedrrfeynhene e t rgttreeh s ehhhhemnphms u ou nrao nnnnennnen rhkwwhhbnhhvhbyhciivmbsrrhdlhlllllhhh geeeeelfhphlrluhsdoofofouuf naa nstcwttt ctttttt s twttwtstsddo mslattet ht wgacaiafsssssbbfstaem o u ra oiieo aaaaaeaeiuii iottttttntttttttnh cciic f mmfpnrehv reeeee po oeoeeoitueoddeatraaoo imgeuimiiwukieu uei o nue nsaasaaor ra e as ue u raroqshstto oamooaie obablaa"; 
+  */           
+var hist = Array(dict.length).fill(0);
+// Pack input into low-value coefficients
+var result = pack(corpus, dict);
+// Restore the original corpus
+var restored = unpack(result, startingDict);
+
+document.getElementById('content').innerHTML = 
+	"Histogram (less flat is better): <br/>"+JSON.stringify(hist) +"<br/><br/>"+ 
+	"Encodings: <br/>"+JSON.stringify(result) +"<br/><br/>"+
+  "Resulting probabilies:<br/>"+JSON.stringify(dict)+"<br/><br/>"+
+  "Original input:<br/>"+restored;
+  
+// always treat next symbol as most likely:
+function pushToFront (arr, from) {
+    arr.splice(0, 0, arr.splice(from, 1)[0]);
+}
+// increase probability slightly
+function pushBackOne (arr, from) {
+	if (from > 0)	arr.splice(from - 1, 0, arr.splice(from, 1)[0]);
+}
+// double probablity of next symbol
+function pullHalfWay (arr, from) {
+	var targ = (from / 2)|0;
+	if (targ != from)	arr.splice(targ, 0, arr.splice(from, 1)[0]);
+}
+
+// pin highest probabilty in place, otherwise shift back one
+function pinShiftOne (arr, from) {
+  if (from < 2) return;
+  else pushBackOne (arr, from);
+}
+
+function SELECTED_METHOD (arr, from) { pullHalfWay(arr, from);}
+
+// corpus, initial dictionary
+function pack (c,d) {
+	var outp = [];
+ 
+	for (var i = 0; i < c.length; i++) {
+  	var idx = d.indexOf(c[i]);
+    if (idx < 0) continue;
+    
+    hist[idx]++;
+    outp.push(idx);
+    SELECTED_METHOD(d, idx);
+  }
+  
+  return outp;
+}
+
+// packed data, same initial dictionary as used to pack
+function unpack (c,d) {
+	var outp = '"';
+ 
+	for (var i = 0; i < c.length; i++) {
+  	var idx = c[i];
+    if (idx < 0) continue;
+    
+    outp+=d[idx];
+    SELECTED_METHOD(d, idx);
+  }
+  
+  return outp + '"';
+}

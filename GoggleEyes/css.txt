@@ -1,0 +1,29 @@
+.underlay{
+  position:absolute;
+}
+.move-area{/*normally use body*/
+  width: 100vw;
+  height: 100vh;
+  padding: 53px 400px;
+}
+.container {
+  width: 100%;
+}
+.eye {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  height: 20px;
+  width: 20px;
+  background: #fff;
+}
+.eye:after { /*pupil*/
+  position: absolute;
+  bottom: 9px;
+  right: 5px;
+  width: 10px;
+  height: 10px;
+  background: #000;
+  border-radius: 50%;
+  content: " ";
+}

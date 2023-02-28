@@ -1,0 +1,17 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+<meta name="image:Cursor" content="http://static.tumblr.com/9ji9tiw/iLgl5njtq/cursor.gif"/>
+<style type="text/css">body, a, a:hover {cursor: url(http://static.tumblr.com/9ji9tiw/iLgl5njtq/cursor.gif), auto;}</style>
+
+<title>Alternate cursor test</title>
+</head>
+<body>&nbsp;
+Your cursor should look different from normal, like this:
+<img src="http://static.tumblr.com/9ji9tiw/iLgl5njtq/cursor.gif" alt="cursor image"/>
+<div style="height:100%">&nbsp;
+<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/></div>
+</body>
+</html>

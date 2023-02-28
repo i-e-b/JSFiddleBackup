@@ -1,0 +1,23 @@
+
+<p>
+The concept is to start a frame with a single 13 bits <tt>0101010101011</tt>, which reprents decimal <tt>376</tt> (hex <tt>0x0178</tt>), which is never valid input from a byte.
+Then all data bytes are fibonacci encoded and stuffed with an extra zero bit.
+</p>
+<p>
+A stream reader can synchronise by looking for <tt>0110</tt>, which should occur at the end of every 'byte'. The frame header gives both timing signal and start-of-frame in minimal space. The receiver can also expect to never see the sequence <tt>111</tt> or any more than 2 consecutive <tt>1</tt>s
+</p>
+<p>
+Any time the decoder sees an invalid sequence, it can mark the output as value <tt>-1</tt>. It can also pessimistically mark neighbouring output bytes as invalid to prevent valid-looking 'bad' data leaking. The final length of bad data is not likely to be the same as the input, so structure inside the message is important if you want to recover from a failure without a re-transmit.
+</p>
+Input:
+<pre id="input">This string will be framed and encoded</pre>
+Input bytes:
+<pre id="inputBytes"></pre>
+Raw output:
+<pre id="output"></pre>
+Damaged output:
+<pre id="damaged">(not damaged. Look in the code to turn it on)</pre>
+Decoded:
+<pre id="decode"></pre>
+Resulting string:
+<pre id="final"></pre>

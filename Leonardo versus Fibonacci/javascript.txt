@@ -1,0 +1,44 @@
+
+var fibonacci = [0,1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584,4181,6765,10946,17711,28657,46368,75025,121393,196418];
+
+var leonardo = [0,1,1,3,5,9,15,25,41,67,109, 177, 287, 465, 753, 1219, 1973, 3193, 5167, 8361, 13529, 21891, 35421, 57313, 92735, 150049, 242785];
+
+// take a single number and return an array encoding of the fibonacci code. Returns empty array on error
+function encodeNum(n,set) {
+    if (n < 1) return [0];
+
+    var res = [];
+
+    // find the smallest fibonacci number greater than `n`
+    var f = 1, k = 1;
+    while (f <= n) {f = set[++k];}
+
+    // decompose back through the sequence
+    while(--k > 1) {
+        f = set[k];
+        if (f <= n) {
+            res.push(1);
+            n -= f;
+        } else {
+            res.push(0);
+        }
+    }
+    
+    res.push(1);
+    res.push(1);
+    return res;
+}
+
+
+var outp = document.getElementById("output");
+outp.innerText += "Fibonacci:   "+encodeNum(123,fibonacci);
+outp.innerText += "\r\n";
+outp.innerText += "Leonardo:    "+encodeNum(123,leonardo);
+outp.innerText += "\r\n\r\n\r\n";
+
+for (let i = 1; i < 1024; i*= 2){
+	outp.innerText += "Fibonacci:   "+encodeNum(i,fibonacci);
+	outp.innerText += "\r\n";
+	outp.innerText += "Leonardo:    "+encodeNum(i,leonardo);
+	outp.innerText += "\r\n\r\n";
+}

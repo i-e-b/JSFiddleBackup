@@ -1,0 +1,16 @@
+/* Page styles. The diagram styles are embedded into the SVG */
+.diagram{
+  border: 1px solid #000;
+  border-radius: 5px;
+  box-shadow: 0px 3px 4px #888;
+  margin: 4px;
+  
+  float: left;
+  width: 100%;
+  min-width: 100px;
+  max-width: 550px;
+}
+.clear {
+  float: none;
+  clear: both;
+}

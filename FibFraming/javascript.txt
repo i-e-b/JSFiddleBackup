@@ -1,0 +1,195 @@
+// Start of frame magic 'number'
+var FRAME_HEAD = 0x0178;//[0,1,0,1,0,1,0,1,0,1,0,1,1];
+
+// Cache of fib sequence
+var fibonacciSeq = [0,1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584,4181,6765,10946,17711,28657,46368,75025,121393,196418];
+
+function fibonacci (n) {
+    if (n > 78) throw new Error("Result will exceed accurate integer range");
+    if (fibonacciSeq.length > n) { return fibonacciSeq[n]; }
+    var res = fibonacci(n-2) + fibonacci(n-1);
+    fibonacciSeq.push(res);
+    return res;
+}
+
+// take a single number and return an array encoding of the fibonacci code. Returns empty array on error
+function fibEncodeNum(n) {
+    if (n < 1) return [];
+
+    var res = [1];
+
+    // find the smallest fibonacci number greater than `n`
+    var f = 1, k = 1;
+    while (f <= n) {f = fibonacci(++k);}
+
+    // decompose back through the sequence
+    while(--k > 1) {
+        f = fibonacci(k);
+        if (f <= n) {
+            res.unshift(1);
+            n -= f;
+        } else {
+            res.unshift(0);
+        }
+    }
+    res.unshift(0); // stuff 1 bit
+    return res;
+}
+
+// Get utf-8 bytes for a string
+// Thanks to https://stackoverflow.com/a/18729931/423033
+function toUTF8Array(str) {
+    var utf8 = [];
+    for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+            utf8.push(0xc0 | (charcode >> 6), 
+                      0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+            utf8.push(0xe0 | (charcode >> 12), 
+                      0x80 | ((charcode>>6) & 0x3f), 
+                      0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+            i++;
+            // UTF-16 encodes 0x10000-0x10FFFF by
+            // subtracting 0x10000 and splitting the
+            // 20 bits of 0x0-0xFFFFF into two halves
+            charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+                      | (str.charCodeAt(i) & 0x3ff));
+            utf8.push(0xf0 | (charcode >>18), 
+                      0x80 | ((charcode>>12) & 0x3f), 
+                      0x80 | ((charcode>>6) & 0x3f), 
+                      0x80 | (charcode & 0x3f));
+        }
+    }
+    return utf8;
+}
+
+// Get string from UTF8
+// Thanks to https://weblog.rogueamoeba.com/2017/02/27/javascript-correctly-converting-a-byte-array-to-a-utf-8-string/
+function stringFromUTF8Array(data){
+    const extraByteMap = [ 1, 1, 1, 1, 2, 2, 3, 0 ];
+    var count = data.length;
+    var str = "";
+    
+    for (var index = 0;index < count;)
+    {
+      var ch = data[index++];
+      if (ch < 0) { // bad data marker
+      	str += "�";
+        continue;
+      }
+      if (ch & 0x80) {
+        var extra = extraByteMap[(ch >> 3) & 0x07];
+        if (!(ch & 0x40) || !extra || ((index + extra) > count))
+          return null;
+        
+        ch = ch & (0x3F >> extra);{
+          var chx = data[index++];
+          if ((chx & 0xC0) != 0x80)
+            return null;
+          
+          ch = (ch << 6) | (chx & 0x3F);
+        }
+      }
+      
+      str += String.fromCharCode(ch);
+    }
+    
+    return str;
+  }
+
+// take an array encoding of a fibonacci code and return a single number. Final `1` must have been removed. Returns null on error
+function fibDecodeNum(arr) {
+		return arr.reduce(function(prev, curr, idx) {
+        return prev + (curr * fibonacci(idx+2));
+    }, 0);
+}
+
+// Take a string and output an array of bit values
+function frameEncodeString(str) {
+  var input = toUTF8Array(str);
+  var encoded = [];
+  // add the frame header:
+  encoded = encoded.concat(fibEncodeNum(FRAME_HEAD));
+  for (var i=0; i < input.length; i++) {
+    // add bits for data
+    encoded = encoded.concat(fibEncodeNum(input[i]+1)); // always add 1, our encoder rejects zero
+  }
+  return encoded;
+}
+
+// try to decode bits from a bit value array
+function fibDecodeBuffer(arr) {
+// TODO -- find frame header
+    if (arr.length < 1) return [];
+    var outp = [];
+    // scan through looking for [1,1]. Decode left and repeat. last bits may not have the [1,1] marker and should be ignored
+    var left = 0, right = 0, len = arr.length, prev = 0;
+    var fullFrame = false;
+    var damaged = false;
+    while (right < len) {
+        if (arr[right] > 0 && prev > 0) { // got a match
+        		var num = fibDecodeNum(arr.slice(left+1, right));
+            if (num == FRAME_HEAD) fullFrame = true;
+            else if (fullFrame) {
+            	var val = num - 1;
+              if (val < 0) { // data is invalid
+              	if (!damaged)	outp.pop(); // remove partial byte
+                damaged = true; // mark that we are in a damaged section
+                outp.push(-1); // write invalid marker
+              } else {
+              	if (damaged) damaged = false; // don't write a partial byte
+              	else outp.push(val); // valid decoded byte
+              }
+            }
+            left = right + 1;
+            right += 1;
+        }
+        prev = arr[right];
+        right++;
+    }
+    return outp;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var inputString = ""+document.getElementById("input").innerText;
+var inputData = toUTF8Array(inputString);
+var encoded = frameEncodeString(inputString);
+
+document.getElementById("inputBytes").innerText = JSON.stringify(inputData);
+
+// display raw output
+var inbits = inputData.length*8;
+var outbits = encoded.length;
+var growth = 0|((outbits / inbits)*100);
+document.getElementById("output").innerText = inbits+" bits in, "+outbits+" bits out ("+ growth+"%) : "+JSON.stringify(encoded).replace(/,/g,'');
+
+// break the encoding!
+if (true){ // set true to damage the encoding, false otherwise
+  for(var x=101;x<120;x++){encoded[x] = 1;}
+  document.getElementById("damaged").innerText = JSON.stringify(encoded).replace(/,/g,'');
+}
+
+document.getElementById("decode").innerText = JSON.stringify(fibDecodeBuffer(encoded));
+document.getElementById("final").innerText = stringFromUTF8Array(fibDecodeBuffer(encoded));
+
+// TODO:
+//   - Add a checksum?
+//   x Show decoding a frame
+//   - Show decoding more than one frame
+//   - Show decoding part-way through a frame
+//   x Show recovering from corrupted data
+

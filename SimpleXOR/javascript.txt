@@ -1,0 +1,67 @@
+
+function encode(str, key) {
+    var keyl = key.length;
+    var mod = 251;																// modulo for nonce
+    var s = (Math.random()*255)|0;								// generate nonce
+    var result = String.fromCharCode(s ^ key[0]); // encode nonce with key
+    for (var i = 0; i < str.length; i++) {				// encode string character-wise
+    	  s = (s*(i+1)) % mod;											// rotate nonce
+        result += String.fromCharCode(
+        s ^ key[i%keyl] ^ str.charCodeAt(i) );		// flip message bits
+    }
+    return btoa(result);													// base64 encode the scrambled data
+}
+
+function decode(code, key) {
+		var hash = atob(code);												// decode base64
+    var result = '';
+    var keyl = key.length;
+    var mod = 251;																// modulo for nonce. MUST match encode
+    var s = hash.charCodeAt(0) ^ key[0];					// recover nonce with key
+    for (var i = 0; i < hash.length-1; i++) {			// decode character-wise
+    	  s = (s*(i+1)) % mod;											// rotate nonce
+        result += String.fromCharCode(
+        s ^ key[i%keyl] ^ hash.charCodeAt(i+1) ); // un-flip message bits
+    }
+    return result;
+}
+
+function makeKey() {
+		// Generate a key based on the browser data and date.
+    // this should be stable over an entire day, so
+    // the nonce is important for encoding
+		var source = navigator.userAgent + new Date().toLocaleDateString();
+    
+    // perform an Adler32 hash to get the key data from this source string
+    var mod = 65521;
+    var a = 1, b = 0;
+    for (var i = 0; i < source.length; i++) {
+        a = (a + source.charCodeAt(i)) % mod;
+        b = (b + a) % mod;
+    }
+    var sum = (b << 16) | a;
+    return [
+    	sum & 0xff, (sum >> 8) & 0xff, (sum >> 16) & 0xff, (sum >> 24) & 0xff
+    ];
+}
+
+///////////////////////////////////////////////////////////////////////////
+////////////////////////////// EXAMPLE USAGE //////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+
+var key = makeKey();
+var xe = encode('My sensitive data', key);
+var xd = decode(xe, key);
+
+var outp = document.getElementById("out");
+
+outp.innerText += "Key = " + key;
+outp.innerText += "\r\n";
+outp.innerText += "Transfer data = "+xe;
+outp.innerText += "\r\n";
+outp.innerText += "Restored data = "+xd;
+
+
+///////////////////////////////////////////////////////////////////////////
+//////////////////////////////      END      //////////////////////////////
+///////////////////////////////////////////////////////////////////////////
