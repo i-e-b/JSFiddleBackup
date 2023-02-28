@@ -1,0 +1,19 @@
+<p>Click to add 'solid' points</p>
+<p id="info">width=64; 4096 pixels; 6 rounds; 24576 merges; 54 samples per pixel.</p>
+<p><input type="checkbox" name="Growing Stride" id="grow" />
+<label for="grow">Growing Stride</label> (growing stride has some stability problems)</p>
+
+<canvas id="canvas" width="64" height="64"></canvas>
+<canvas id="stage1" width="64" height="64"></canvas>
+<canvas id="stage2" width="64" height="64"></canvas>
+<canvas id="stage3" width="64" height="64"></canvas>
+<canvas id="stage4" width="64" height="64"></canvas>
+<canvas id="stage5" width="64" height="64"></canvas>
+<canvas id="stage6" width="64" height="64"></canvas>
+<canvas id="stage7" width="64" height="64"></canvas>
+<canvas id="stage8" width="64" height="64"></canvas>
+
+<p>
+<button onclick="resetPoints()">Clear</button>
+<button onclick="makeBigger()">Bigger</button>
+</p>

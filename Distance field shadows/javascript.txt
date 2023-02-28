@@ -1,0 +1,549 @@
+let c = document.getElementById('canvas');
+let overlay = document.getElementById('overlay');
+let outer = document.getElementById('container');
+
+let ctx = c.getContext('2d');
+let ctxo = overlay.getContext('2d');
+
+let doBlur = document.getElementById('blur');
+let doJitterStart = document.getElementById('jitterStart');
+let doJitterStep = document.getElementById('jitterStep');
+let doSurfaceCheck = document.getElementById('surfaceCheck');
+let doUseCone = document.getElementById('useCone');
+
+let height = c.height;
+let width = c.width;
+let pxCount = height * width;
+
+let floor = Math.floor;
+
+ctx.globalAlpha = 1.0;
+ctx.fillStyle = "#000";
+
+let lightMap = []; // 0..1 lightness values
+let solidMap = []; // areas drawn solid
+let distanceMap = []; // distance to nearest edge, or zero if in solid area
+let xPosMap = []; // X position of nearest edge
+let yPosMap = []; // Y position of nearest edge
+let xNormMap = []; // normalised dx vector toward nearest edge
+let yNormMap = []; // normalised dy vector toward nearest edge
+
+
+
+// Core of the shadow generation
+//
+// Mouse point (x,y) acts as the light source
+// for each point in the distance map,
+// 1. If 'solid', mark black and stop
+// 2. Step toward mouse position, recording smallest step size
+//    - if we get to a solid, mark dark and stop
+//    - mark light based on min step size
+function updateLightAndShadow(x, y) {
+	if (x < 1) x = 1;
+  if (x >= width) x = width - 1;
+	if (y < 1) y = 1;
+  if (y >= height) y = height - 1;
+
+  let idx = (y * width) + x;
+  if (solidMap[idx] > 0) return;
+
+	const useCone = doUseCone.checked;
+  const lightRadius = 600; // Light fades to 0.0 at this radius
+  const edgeDistance = 25; // how close to solid objects should we fade out soft shadows
+
+  let lightDist = distanceMap[(y * width) + x]; // free space at light source
+
+  // scan through all map points
+  for (let sy = 0; sy < height; sy++) {
+    for (let sx = 0; sx < width; sx++) {
+      let idx = (sy * width) + sx;
+      
+      lightMap[idx] = 0; // set default to fully dark
+
+      // point is solid. No light
+      if (solidMap[idx] > 0) {
+        continue;
+      }
+
+      let dx = x - sx; // from sample toward light
+      let dy = y - sy;
+      let totalDist = Math.sqrt(dx * dx + dy * dy); // from sample to light
+
+      // too far from light to contribute anything
+      if (totalDist > lightRadius) {
+        continue;
+      }
+      if (totalDist == 0) {
+        lightMap[idx] = 1.0;
+        continue;
+      } // directly under light
+
+      if (totalDist < lightDist) { // light is the closest thing
+        let fadeRatio = 1.0 - clamp(totalDist / lightRadius);
+        let distFactor = fadeRatio * fadeRatio; // quadratic fall-off (roughly)
+        lightMap[idx] = 1 * distFactor;
+        continue;
+      }
+
+      dx /= totalDist; // normalise d.xy to ray direction unit vector
+      dy /= totalDist;
+
+      // progress is from 0.0 to totalDistance.
+      // We start at our known free distance, but we jitter it to reduce banding.
+      // (doing this saves calls to 'random()' in the march)
+      let progress = distanceMap[idx];
+      if (doJitterStart.checked){
+        progress *=  Math.random();
+      }
+      let lightLeft = 1.0; // brightness of the sample. We will reduce if near an edge
+
+      // Ray march from the sample point toward the light.
+      for (let q = 0; q < 25; q++) { // safety limit
+        if (progress >= totalDist) { // found a free path to the light
+          let fadeRatio = 1.0 - clamp(totalDist / lightRadius);
+          let distFactor = fadeRatio * fadeRatio; // quadratic fall-off (roughly)
+          lightMap[idx] = lightLeft * distFactor;
+          break;
+        }
+
+        var nx = 0 | ((dx * progress) + sx); // new sample point for this step
+        var ny = 0 | ((dy * progress) + sy); // must be integer
+        var n_idx = (ny * width) + nx;
+        var stepDist = distanceMap[n_idx]; // get free distance at this sample point
+
+        if (solidMap[n_idx] > 0) break; // hit solid object. No path to light.
+
+				let cone = stepDist;
+				if (useCone){
+        	cone *= stepDist;
+        }
+
+				if (doSurfaceCheck.checked){
+          // pinch factor for smooth shadows
+          // light most affected by close proximity near middle of path
+          // as we get close to a surface, this breaks down, so we start blending it out
+          let bv = lightDist > edgeDistance ? edgeDistance : lightDist;
+          let bu = edgeDistance - bv;
+
+          lightLeft = (bu * lightLeft) + (bv * Math.min(lightLeft, (cone / progress)));
+          lightLeft /= edgeDistance;
+				} else {
+        	lightLeft = Math.min(lightLeft, (cone / progress));
+        }
+
+        // advance step
+        // we jitter the step to reduce banding artifacts.
+        
+        let jitter = 1; // no jitter
+        if (doJitterStep.checked){
+        	jitter = Math.random(); // random jitter
+        }
+        progress += stepDist * jitter;
+      } // end of ray-march
+
+    } // end of X scan
+  } // end of Y scan
+
+  // smooth the light map a little to reduce jitter noise
+  // this is a simple 1D box blur applied twice
+  if (doBlur.checked){
+    // Blur in x
+    let _1 = 1, _2 = 2;
+    for (let sy = 0; sy < height; sy++) {
+      let idx = (sy * width);
+      let v = lightMap[idx];
+      v += lightMap[idx];
+      idx += _1;
+      for (let sx = 1; sx < width - 1; sx++) {
+        v += lightMap[idx];
+        lightMap[idx - _1] = v / 2;
+        idx+=_1;
+        v -= lightMap[idx - _2];
+      }
+    }
+
+    // Blur in y
+    _1 = width; _2 = 2 * _1;
+    for (let sx = 0; sx < width; sx++) {
+      let idx = sx;
+      let v = lightMap[idx];
+      v += lightMap[idx];
+      idx += _1;
+      for (let sy = 1; sy < height - 1; sy++) {
+        v += lightMap[idx];
+        lightMap[idx - _1] = v / 2;
+        idx += _1;
+        v -= lightMap[idx - _2];
+      }
+    }
+  }
+}
+
+
+
+
+
+// take +- number, and pin to 0..255
+function pin(v) {
+  if (v > 255) return 255;
+  if (v < 0) return 0;
+  return v;
+}
+
+var com = 4; // 4 components( RGBA )
+var imgBytes = width * height * com;
+var u8a = new Uint8Array(imgBytes); // pixel array
+
+function drawPixelArrayToCanvas(theContext) {
+  var UAC = new Uint8ClampedArray(u8a, width, height);
+  var DAT = new ImageData(UAC, width, height);
+  theContext.putImageData(DAT, 0, 0);
+}
+
+function lightBufferToPixelArray() {
+  let w = width;
+  let h = height;
+  let rowWidth = w * com; // number of bytes in an image row
+  let ci = 0; // pixel component index
+  let i = 0; // map index
+
+	let factor = 255;
+  let offset = 200;
+  
+  if (drawMode){
+  	factor = 100;
+    offset = 100;
+  }
+  
+  for (let y = 0; y < h; y++) {
+    let yoff = y * rowWidth;
+    let yi = y * width;
+    for (let x = 0, xoff = 0; x < w; x++, xoff += com) {
+      ci = yoff + xoff;
+      i = yi + x;
+
+      if (solidMap[i] > 0) {
+        u8a[ci + 0] = 0; // Red
+        u8a[ci + 1] = 0; // Green
+        u8a[ci + 2] = 0; // Blue
+        u8a[ci + 3] = 0; // Alpha
+      } else {
+        let c = pin(lightMap[i] * factor) * 0.784;
+
+        u8a[ci + 0] = 0; // Red
+        u8a[ci + 1] = 0; // Green
+        u8a[ci + 2] = 0; // Blue
+        u8a[ci + 3] = offset - c; // Alpha
+      }
+    }
+  }
+}
+
+function distanceBuffersToPixelArray() {
+  let w = width;
+  let h = height;
+  let rowWidth = w * com; // number of bytes in an image row
+  let ci = 0; // pixel component index
+  let i = 0; // map index
+
+  for (let y = 0; y < h; y++) {
+    let yoff = y * rowWidth;
+    let yi = y * width;
+    for (let x = 0, xoff = 0; x < w; x++, xoff += com) {
+      ci = yoff + xoff;
+      i = yi + x;
+
+      if (solidMap[i] > 0) {
+        u8a[ci + 0] = 0; // Red
+        u8a[ci + 1] = 0; // Green
+        u8a[ci + 2] = 0; // Blue
+        u8a[ci + 3] = 255; // Alpha
+      } else {
+
+        let d = 0 | (255 - Math.log(1 + distanceMap[i]) * 32);
+
+        let cr = pin(((xNormMap[i] + 1) / 2) * d);
+        let cR = pin(((yNormMap[i] + 1) / 2) * d);
+
+        u8a[ci + 0] = cr; // Red
+        u8a[ci + 1] = d; // Green
+        u8a[ci + 2] = cR; // Blue
+        u8a[ci + 3] = 255; // Alpha
+      }
+    }
+  }
+}
+
+// reset arrays before doing jump flood
+function prepareForJumpFlood() {
+  let sqrMaxDist = (height * height) + (width * width);
+  for (let y = 0; y < height; y++) {
+    let yi = y * width;
+    for (let x = 0; x < width; x++) {
+      let i = yi + x;
+
+      // set position to X,Y on solid areas, NaN on empty
+      xPosMap[i] = x / solidMap[i];
+      yPosMap[i] = y / solidMap[i];
+    }
+  }
+}
+
+// return the sample index out of the one provided
+// that has the least distance
+function mergeSamples(bestDistance, x, y, current, samples) {
+  let bestSample = current;
+  for (let i = 0; i < samples.length; i++) {
+    let sample = samples[i];
+
+    let dx = x - xPosMap[sample];
+    let dy = y - yPosMap[sample];
+    let thisDist = (dx * dx) + (dy * dy);
+
+    if (thisDist < bestDistance) {
+      bestDistance = thisDist;
+      bestSample = sample;
+    }
+  }
+  return bestSample;
+}
+
+// do a round of jump-flood filling
+let dir = 1;
+let mergeCount = 0;
+
+function jumpFloodRound(stride) {
+  let min = Math.min;
+  let max = Math.max;
+  let limit = pxCount - 1;
+  let sqrMaxDist = (height * height) + (width * width);
+  let dy = stride >> 1;
+  if (dy < 1) dy = 1;
+  let dx = dy;
+  let y0 = 0;
+  let x0 = 0;
+  if (dir < 0) {
+    dy = -dy;
+    y0 = height - 1;
+  }
+  dir = -dir;
+
+  for (let y = y0; y < height && y >= 0; y += dy) {
+    let y1 = (y - stride) * width;
+    let y2 = y * width;
+    let y3 = (y + stride) * width;
+
+    dx = -dx;
+    x0 = (width - 1) - x0;
+
+    for (let x = x0; x < width && x >= 0; x += dx) {
+
+      let r1 = y1 + x;
+      let r2 = y2 + x;
+      let r3 = y3 + x;
+      let i = r2;
+
+      let nextIndex = mergeSamples(sqrMaxDist, x, y, i, [
+        max(r1 - stride, 0), max(r1, 0), max(r1 + stride, 0),
+        max(r2 - stride, 0), r2, min(r2 + stride, limit),
+        min(r3 - stride, limit), min(r3, limit), min(r3 + stride, limit)
+      ]);
+      mergeCount++;
+
+      // update values
+      xPosMap[i] = xPosMap[nextIndex];
+      yPosMap[i] = yPosMap[nextIndex];
+      distanceMap[i] = distanceMap[nextIndex];
+    }
+  }
+
+}
+
+// use jump flood algorithm to find nearest
+// edge for each point in the map.
+function calculateNearestPositions() {
+  prepareForJumpFlood();
+  mergeCount = 0;
+  dir = -1;
+  jumpFloodRound(1);
+  jumpFloodRound(1);
+
+  let pixelCount = width * height;
+  let samplePerPixel = (mergeCount / pixelCount) * 9;
+
+  document.getElementById('stats').innerText =
+    `${width}x${height}. ${pixelCount} pixels. ${mergeCount} merges. ${samplePerPixel} samples per pixel`;
+}
+
+// calculate distances based on nearest point
+function calculateDistances() {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let idx = (y * width) + x;
+
+      // these are real distances, so we need to do the math
+      let dx = x - xPosMap[idx];
+      let dy = y - yPosMap[idx];
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      distanceMap[idx] = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist != 0) {
+        xNormMap[idx] = dx / dist;
+        yNormMap[idx] = dy / dist;
+      }
+    }
+  }
+}
+
+function updateDistanceMap() {
+  calculateNearestPositions();
+  calculateDistances();
+}
+
+// render a text string into an int array
+function drawIntoArray(str, size, x, y, target) {
+  var c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  var a = c.getContext('2d');
+  a.fillStyle = "#000";
+  a.fillRect(0, 0, c.width, c.height);
+
+  a.fillStyle = "#fff";
+  a.font = size + 'px monospace';
+  a.fillText(str, x, y + size);
+  var data = a.getImageData(0, 0, c.width, c.height).data;
+  var sz = width * height;
+  for (var i = 0; i < sz; i++) {
+    target[i] = ((data[i * 4] > 100) ? (1) : (target[i]));
+  }
+}
+
+// update and re-draw distance map
+function refreshAll() {
+  updateDistanceMap();
+  distanceBuffersToPixelArray();
+  drawPixelArrayToCanvas(ctx);
+}
+
+// clamp value to range 0..1
+function clamp(x) {
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+
+var solidTouched = true; // set to true when solids map is changed
+var shadowTouched = true; // set to true when shadow map needs updated
+var drawMode = false; // mouse is down, should set solid points on mouse move
+var mouseX = 263; // good starting place for thumbnail
+var mouseY = 90;
+
+function drawDotAt(x,y){
+  if (x < 3 || x >= width - 3) return;
+  if (y < 3 || y >= height - 3) return;
+
+  let idx = 0|(x + width * y);
+  for (let z=0; z<3; z++){
+    solidMap[z+idx-width] = 1;
+    solidMap[z+idx] = 1;
+    solidMap[z+idx+width] = 1;
+  }
+  solidTouched = true;
+}
+
+// click to draw solid areas
+outer.onmousedown = function(e) {
+  drawMode = true;
+  let x = floor(e.offsetX);
+  let y = floor(e.offsetY);
+  
+  mouseX = 0|(x - 25);
+  mouseY = 0|(y - 25);
+  
+  drawDotAt(x,y)
+  shadowTouched = true;
+};
+outer.onmouseup = function(e) {
+  drawMode = false;
+};
+outer.onmouseout = function(e) {
+  drawMode = false;
+};
+
+let t0 = 0;
+function loopRedraw(t1){
+	let dt = t1 - t0; t0 = t1;
+
+	document.getElementById('frameRate').innerText = "fps="+ Math.round(1000 / dt);
+
+	// update distance maps
+  if (solidTouched){
+  	refreshAll();
+    solidTouched = false;
+  }
+  
+  // calculate light map from distance map
+  if (shadowTouched) {
+    updateLightAndShadow(mouseX, mouseY);
+
+    // render light map to canvas
+    lightBufferToPixelArray();
+    drawPixelArrayToCanvas(ctxo);
+    shadowTouched = false;
+  }
+  
+  // loop
+	window.requestAnimationFrame(loopRedraw);
+}
+
+function resetPoints() {
+	// clear all points except one (otherwise the distance algorithm breaks)
+  solidMap[0]=1;
+  const end = width*height;
+  for (let i = 1; i < end; i++) {solidMap[i]=0;}
+  shadowTouched = true;
+  solidTouched = true;
+}
+
+outer.onmousemove = function(e) {
+  shadowTouched = true;
+  let x = floor(e.offsetX);
+  let y = floor(e.offsetY);
+  
+  if (x < 3 || x >= width - 3) return;
+  if (y < 3 || y >= height - 3) return;
+  
+  if (drawMode) {
+    // 3x3 dot
+  	drawDotAt(x,y);
+    solidTouched = true;
+    
+    // move the light, so we don't try to light the newly solid pixel
+  	mouseX = 0|(x - 25);
+  	mouseY = 0|(y - 25);
+  } else {
+  	mouseX = 0|(x);
+  	mouseY = 0|(y);
+  }
+}
+
+// set up the maps with zero data
+for (let i = 0; i < pxCount; i++) {
+  lightMap.push(0);
+  solidMap.push(0);
+  xPosMap.push(0);
+  yPosMap.push(0);
+  xNormMap.push(0);
+  yNormMap.push(0);
+  distanceMap.push(0);
+}
+
+// add some solid areas, and show an initial overlay for the thumbnail
+drawIntoArray("shadow", 64, 5, 1, solidMap);
+drawIntoArray("[ C G", 128, 10, 80, solidMap);
+
+window.requestAnimationFrame(loopRedraw);
+
+//refreshAll();
+//updateLightAndShadow(263, 90);

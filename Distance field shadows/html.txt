@@ -1,0 +1,24 @@
+<h4>Click to add 'solid' points; Move cursor to change lighting</h4>
+<div id="container">
+    <canvas id="canvas" class="subcanv" width="512" height="512"></canvas>
+    <canvas id="overlay" class="subcanv" width="512" height="512"></canvas>
+</div>
+
+<input type="checkbox" id="blur" checked />
+<label for="blur">Blur shadow map</label>
+
+<input type="checkbox" id="jitterStart" checked />
+<label for="jitterStart">Jitter ray offset</label>
+
+<input type="checkbox" id="surfaceCheck" checked />
+<label for="surfaceCheck">Near-surface checks</label>
+
+<input type="checkbox" id="useCone" checked />
+<label for="useCone">Soften by area</label>
+
+<input type="checkbox" id="jitterStep" />
+<label for="jitterStep">Jitter ray steps</label>
+
+<p id="frameRate"></p>
+<p>Distance map: <span id="stats"></span></p>
+<button onclick="resetPoints()">Clear</button>
