@@ -1,0 +1,12 @@
+<canvas id="renderCanvas" 
+         width ="512" 
+         height="512">
+</canvas>
+<canvas id="colorCanvas" 
+         width ="512" 
+         height="512">
+</canvas>
+<canvas id="heightCanvas" 
+         width ="512" 
+         height="512">
+</canvas>

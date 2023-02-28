@@ -1,0 +1,22 @@
+<h2>Summing different ways</h2>
+<table>
+<tr>
+<td>Correct</td><td><code id="expected"></code></td><td><span class="meta" id="meta1">meta</span></td>
+</tr><tr>
+<td>Trivial accumulator</td><td><code id="accum"></code></td><td><span class="meta" id="meta2">meta</span></td>
+</tr><tr>
+<td>Sorted accumulator</td><td><code id="sortAccum"></code></td><td><span class="meta" id="meta3">meta</span></td>
+</tr><tr>
+<td>Folding</td><td><code id="fold"></code></td><td><span class="meta" id="meta4">meta</span></td>
+</tr><tr>
+<td>Sorted Folding</td><td><code id="sortFold"></code></td><td><span class="meta" id="meta5">meta</span></td>
+</tr><tr>
+<td>Triangular list</td><td><code id="triangles"></code></td><td><span class="meta" id="meta6">meta</span></td>
+</tr><tr>
+<td>Sorted triangular</td><td><code id="sortTriangles"></code></td><td><span class="meta" id="meta7">meta</span></td>
+</tr>
+</table>
+<p>Here we sum a long list of small values over JavaScript numbers in a range of ways</p>
+<p>List with accumulator is the trivial way: <code>sum += next</code>. We also do this with values sorted small-to-large</p>
+<p>Folding is a bit like the game 2048. We add pairs of numbers together when they have the same scale. We also do this with a sorted list</p>
+<p>Triangular lists is similar to folding, but reduces the list length by half each time. This method works well when stored, as it gives a kind of MIP map over values. Again, done on scattered and sorted values</p>

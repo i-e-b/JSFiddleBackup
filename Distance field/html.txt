@@ -1,0 +1,6 @@
+<p>Click to add 'solid' points</p>
+<p id="stats"></p>
+<div id="container">
+    <canvas id="canvas" class="subcanv" width="512" height="512"></canvas>
+    <canvas id="overlay" class="subcanv" width="512" height="512"></canvas>
+</div>

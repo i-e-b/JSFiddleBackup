@@ -1,0 +1,175 @@
+
+
+// The number list to sum 
+let base = [];
+let expected = BigInt("0");
+for (let i = 0; i < 10000; i++){ // you could replace this with random values to see relative errors.
+
+	let value = 0|(Math.random() * 10000000);
+	expected += BigInt(value);
+  base.push(value / 10000000);
+}
+
+let hack = ""+expected;
+hack = hack.slice(0,4) + "." + hack.slice(4);
+document.getElementById('expected').innerText = hack;
+document.getElementById('meta1').innerText = `(items = ${base.length})`;
+
+/// ------- Accumulator ------------ ///
+
+let accum = 0.0;
+let aCount = 0;
+
+for (let i = 0; i < base.length; i++){
+	accum += base[i];
+  aCount++;
+}
+document.getElementById('accum').innerText = accum;
+document.getElementById('meta2').innerText = `(operations = ${aCount})`;
+console.log("accum done");
+
+/// ------- Accumulator (sorted) ------------ ///
+let sortList = [...base];
+let sortAccum = 0.0;
+let sCount = 0|(Math.log2(sortList.length)*sortList.length); // sort operations
+sortList.sort(function(a, b){return a - b}); // ascending. You can sort the other way to maximise error
+for (let i = 0; i < sortList.length; i++){
+	sortAccum += sortList[i];
+  sCount++;
+}
+document.getElementById('sortAccum').innerText = sortAccum;
+document.getElementById('meta3').innerText = `(operations = ${sCount})`;
+console.log("sortAccum done");
+
+
+/// ------- Folding --------------- ///
+
+let fold = []; // list of values we will fold down
+let fCount = 0;
+function foldReduce(end){ // each item absorbs the next if same scale
+	for (let i = 0; i < fold.length - 1; i++){
+    fCount++; // count all compares
+    
+  	// if the two can be folded, do so, then copy all the values back one
+    // and reset i to zero.
+  	if (end || (fold[i].s === fold[i+1].s)) {
+    	fold[i].v += fold[i+1].v;
+    	fold[i].s += fold[i+1].s;
+			for (let j = i+1; j < fold.length; j++){
+      	fold[j] = fold[j+1];
+      }
+      fold.pop(); // remove duplicated last item
+      i = -1; // try the whole thing again
+    }
+  }
+}
+
+for (let i = 0; i < base.length; i++){ // new mutable list with 'scale' annotation
+	fold.push({v:base[i],s:1});
+}
+foldReduce(false); // keep scales as equal as possible
+let lastScale = fold[0].s;
+foldReduce(true); // finalise
+
+document.getElementById('fold').innerText = fold[0].v;
+document.getElementById('meta4').innerText = `(ops = ${fCount}, items = ${fold[0].s}, last scale = ${lastScale})`;
+console.log("fold done");
+
+
+/// ------- Folding (sorted) --------------- ///
+fold = []; // list of values we will fold down
+fCount = 0|(Math.log2(sortList.length)*sortList.length); // sort operations
+
+for (let i = 0; i < sortList.length; i++){ // new mutable list with 'scale' annotation
+	fold.push({v:sortList[i],s:1});
+}
+foldReduce(false); // keep scales as equal as possible
+foldReduce(true); // finalise
+
+document.getElementById('sortFold').innerText = fold[0].v;
+document.getElementById('meta5').innerText = `(ops = ${fCount}, items = ${fold[0].s})`;
+console.log("sortFold done");
+
+
+/// ------- Triangular list --------------- ///
+
+let triList = [[]]; // a list-of-lists. Head of list is the smallest so far
+let tCount = 0;
+
+for (let i = 0; i < base.length; i++){ // copy source (not counted as ops)
+	triList[0].push(base[i]);
+}
+
+let rounds = 0|(Math.log2(base.length) + 1); // to prevent errors causing an infinite loop
+//console.log(`expecting ${rounds} rounds`);
+
+for (let q = 0; q < 15; q++){
+	if (triList[0].length < 2) break;
+	
+	// build a new list, and join pairs. Any 'spare' end is folded in to the first item
+  triList.unshift([]); // new empty
+  for (let i = 0; i < triList[1].length; i+=2){
+  	let k = i >> 1; // index in new array
+  	let j = i+1; // second index of pair
+    if (j >= triList[1].length){ // spare
+    	tCount++;
+    	triList[0][0] += triList[1][i];
+    } else { // pairs
+    	tCount++;
+    	triList[0][k] = triList[1][i] + triList[1][j];
+    }
+  }
+  triList.pop(); // don't need the larger list any more
+}
+
+document.getElementById('triangles').innerText = triList[0][0];
+document.getElementById('meta6').innerText = `(ops = ${tCount})`;
+console.log("triangles done");
+
+
+/// ------- Triangular list (sorted) --------------- ///
+
+triList = [[]]; // a list-of-lists. Head of list is the smallest so far
+tCount = 0|(Math.log2(sortList.length)*sortList.length); // sort operations
+
+for (let i = 0; i < sortList.length; i++){ // copy source (not counted as ops)
+	triList[0].push(sortList[i]);
+}
+
+rounds = 0|(Math.log2(base.length) + 1); // to prevent errors causing an infinite loop
+//console.log(`expecting ${rounds} rounds`);
+
+for (let q = 0; q < 15; q++){
+	if (triList[0].length < 2) break;
+	
+	// build a new list, and join pairs. Any 'spare' end is folded in to the last item
+  triList.unshift([]); // new empty
+  for (let i = 0; i < triList[1].length; i+=2){
+  	let k = i >> 1; // index in new array
+  	let j = i+1; // second index of pair
+    if (j >= triList[1].length){ // spare
+    	tCount++;
+    	triList[0][k-1] += triList[1][i];
+    } else { // pairs
+    	tCount++;
+    	triList[0][k] = triList[1][i] + triList[1][j];
+    }
+  }
+  triList.pop(); // don't need the larger list any more
+}
+
+document.getElementById('sortTriangles').innerText = triList[0][0];
+document.getElementById('meta7').innerText = `(ops = ${tCount})`;
+console.log("sortTriangles done");
+
+
+
+
+
+
+
+
+
+
+
+

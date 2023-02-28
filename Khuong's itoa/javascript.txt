@@ -1,0 +1,48 @@
+function log(msg){
+	document.getElementById('outp').innerText += msg + "\r\n";
+}
+
+log("Testing compared to default implementation:");
+
+let target = ['0','0','0','0',  '0','0','0','0',
+              '0','0','0','0',  '0','0','0','0'];
+
+// Adapted from https://lemire.me/blog/2021/11/18/converting-integers-to-fix-digit-representations-quickly/
+
+function encode_ten_thousands(hi,lo) {
+  let merged = hi | (lo << 32n);
+  let top = ((merged * 10486n) >> 20n) & ((0x7Fn << 32n) | 0x7Fn);
+  let bot = merged - 100n * top;
+  
+  let hundreds = (bot << 16n) + top;
+  let tens = (hundreds * 103n) >> 10n;
+  tens = tens & ( (0x0Fn << 48n) | (0x0Fn << 32n) | (0x0Fn << 16n) | 0x0Fn);
+  tens += (hundreds - 10n * tens) << 8n;
+
+  return tens;
+}
+
+function memcpy(v, o){
+  for (let i = 7, j = 56; i >= 0; i--, j -= 8){
+  	target[i+o] = String.fromCharCode(Number((v >> BigInt(j)) & 0xFFn));
+  }
+}
+
+function to_string_khuong(x) {
+  let top = x / 100000000n;
+  let bottom = x % 100000000n;
+  let first = 0x3030303030303030n + encode_ten_thousands(top / 10000n, top % 10000n);
+  
+  //memcpy(out, &first, sizeof(first));
+  memcpy(first, 0); // --> js can't do pointer tricks
+  
+  let second = 0x3030303030303030n + encode_ten_thousands(bottom / 10000n, bottom % 10000n);
+      
+  //memcpy(out + 8, &second, sizeof(second));
+  memcpy(second, 8); 
+}
+
+//--------------------------------------------------------------//
+let srcValue = BigInt(1463856256);
+to_string_khuong(srcValue);
+log(target.join("") + " -> " + srcValue);

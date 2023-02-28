@@ -1,0 +1,49 @@
+
+// parameters
+var angle = 0.0;
+const endAngle = 360 * 4;
+
+// canvas bits
+var c = document.getElementById('canvas');
+var ctx = c.getContext('2d');
+ctx.globalAlpha = 1.0;
+ctx.fillStyle = "#000";
+var h2 = c.height / 2;
+var w2 = c.width / 2;
+var h3 = c.height / 3;
+var w3 = c.width / 3;
+var h8 = c.height / 8;
+var w8 = c.width / 8;
+const width = c.width;
+const height = c.height;
+
+// spiral function
+function spiralPoint(degrees) {
+  const b = 9.0;
+  let t = degrees * Math.PI / 180;
+  let at = t / 7;
+  let dt = at*at;
+  let r = (b * (t-dt)) / 2;
+  return {
+    x: (w2 + r * Math.cos(t)),
+    y: (h2 + r * Math.sin(t)),
+    x1: (w2 - r * Math.cos(t)),
+    y1: (h2 - r * Math.sin(t)),
+    r: r
+  };
+}
+
+// drawing
+var count = 0;
+let step = 1;
+while (angle < endAngle && step > 0.0) {
+count++; if (count > 9000) break;
+
+	let p = spiralPoint(angle);
+  ctx.fillRect(p.x, p.y, 1, 1);
+  ctx.fillRect(p.x1, p.y1, 1, 1);
+  step = 180 / ((p.r+0.5) * 2);
+  if (step < 0.01) step = 0.01;
+  if (step > 5) step = 5;
+  angle += step;
+}

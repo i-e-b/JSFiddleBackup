@@ -1,0 +1,120 @@
+// THIS \|/ Tries to load by AJAX ( https://stackoverflow.com/questions/38355093/how-can-i-set-an-html5-canvas-imagedata-from-an-xmlhttprequest-response )
+
+
+// creates an image from a binary array
+// buf   : is the image as an arrayBuffer
+// type  : is the mime image type "png", "jpg", etc...
+// returns a promise that has the image
+function arrayToImage(buf, type) {
+  // define variables
+  var url, chars, bWord, i, data, len, count, stream, wordMask, imagePromise;
+  // define functions
+  imagePromise = function(resolve, reject) { // function promises to return an image
+    var image = new Image(); // create an image
+    image.onload = function() { // it has loaded
+      resolve(image); // fore fill the promise
+    }
+    image.onerror = function() { // something rotten has happened
+      reject(image); // crossing the fingers
+    }
+    image.src = url; // use the created data64URL to ceate the image
+  }
+
+  wordMask = 0b111111; // mask for word base 64 word
+  stream = 0; // to hold incoming bits;
+  count = 0; // number of bits in stream;
+  // 64 characters used to encode the 64 values of the base64 word
+  chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+  data = new Uint8Array(buf); // convert to byte array
+  len = data.byteLength; // get the length;
+  url = 'data:image/' + type.toLowerCase() + ';base64,'; // String to hold the image URL
+
+  // get each byte and put it on the bit stream
+  for (i = 0; i < len; i++) {
+    stream |= data[i]; // add byte to bit stream
+    count += 8; // add the number of bits added to stream
+    if (count === 12) { // if there are two 6bit words on the stream
+      url += chars[(stream >> 6) & wordMask] + chars[stream & wordMask]; // encode both words and add to base 64 string
+      stream = 0; // stream is empty now so just zero
+      count = 0; // no bits on the stream
+    } else {
+      url += chars[(stream >> (count - 6)) & wordMask]; // encode top 6 bits and add to base64 string
+      count -= 6; //decrease the bit count by the 6 removed bits
+      stream <<= 8; // make room for next 8 bits
+    }
+  }
+  if (count > 0) { // there could be 2 or 4 remaining bits
+    url += chars[(stream >> (count + 2)) & wordMask]; // shift them  back to B64 word size and encode
+  }
+  // data url constructed for image so lets promise to create it
+  return new Promise(imagePromise); // return the promise
+}
+// loads an image via ajax providing progress data
+// WARNING cross domain images will fail if they have a CORS header prohibiting your domain from access
+// filename : url of the image file
+// progress : progress call back. This is called on progress events
+// returns a promise of an image
+var loadImage = function(filename, progress) {
+  // declare variables
+  var imagePromise;
+  // declare functions
+  imagePromise = function(resolve, reject) { // promise an image
+    // decalare vars;
+    var ajax, image, load, failed;
+    // decalare functions
+    failed = function(reason) {
+      reject(reason);
+    } // pass on the bad news
+    load = function(e) { // handle load event
+      // declare vars
+      var type, loaded;
+      // decalare functions
+      loaded = function(image) {
+        resolve(image);
+      } // resolve the promise of an image
+
+      if (e.currentTarget.status !== 200) { // anything but OK reject the promise and say sorry
+        reject("Bummer dude! Web says '" + e.currentTarget.status + "'");
+      } else {
+        type = filename.split(".").pop(); // ok we have the image as a binary get the type
+        // now convert it to an image
+        arrayToImage(e.currentTarget.response, type) // return a promise 
+          .then(loaded) // all good resolve the promise we made
+          .catch(failed); // failed could be a bug in the soup.
+      }
+    };
+
+    ajax = new XMLHttpRequest(); // create the thingy that does the thing
+    ajax.overrideMimeType('text/plain; charset=x-user-defined'); // no not an image. 
+    ajax.responseType = 'arraybuffer'; // we want it as an arraybuffer to save space and time
+    ajax.onload = load; // set the load function
+    ajax.onerror = failed; // on error
+    ajax.onprogress = progress; // set the progress callback
+    ajax.open('GET', filename, true); // point to the image url
+    ajax.send(); // command the broswer to wrangle this image from the server gods
+  }
+  return new Promise(imagePromise);
+}
+
+
+var canvas = document.getElementById("targetCanvas");
+ctx = canvas.getContext("2d");
+
+// The image name. 
+var imageName = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Broadway_tower_edit.jpg/800px-Broadway_tower_edit.jpg";
+
+// lets load the image and see if all this actualy works.
+loadImage(imageName, null)
+  .then(function(image) { // well what do you know it works
+    ctx.drawImage(image, 0, 0, ctx.canvas.width, ctx.canvas.height); // draw the image on the canvas to prove it
+
+    // Read data out of the canvas:
+
+    var data = ctx.getImageData(10, 10, 1, 1).data;
+    var rgb = [data[0], data[1], data[2]];
+    console.log(rgb);
+  })
+  .catch(function(reason) {
+    console.log(reason); // did not load, that sucks!
+  })

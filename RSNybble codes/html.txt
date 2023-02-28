@@ -1,0 +1,19 @@
+
+<h1>Reed Solomon coding for user account numbers</h1>
+<p>Symbols on the range [0..15], optimised for "feature phone" input. This can correct 1 or 2 errors, and detect most reasonable input errors.</p>
+<p>32 bits of code padded into 8 digits of [1..9], 2 digits of [0..15], plus <span id="infoCD">?</span> check digits in range of [0..15]. Allows for 4'026'531'839 unique IDs</p>
+<p>Note that the generated tag IDs only have 31 bits of entropy. This is to prevent short IDs, and make IDs harder to guess. It is not a limitation of the coding.</p>
+
+<button id="reRoll">New random Tag ID</button><br/>
+<br/>
+Tag ID: <input type="text" id="hexTagId" value="?"/><br/>
+Tag Code: <code id="displayedCode">?</code><br/>
+User input: <input type="text" id="userInput" value="?"/>
+<button id="checkBtn">Check</button>
+<button id="resetBtn">Reset</button><br/>
+<br/>
+Result: <code id="resultCode">?</code><br/>
+<br/>
+<hr/>
+<h3>log</h3>
+<pre id="outp"></pre>

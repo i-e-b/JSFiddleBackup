@@ -1,0 +1,326 @@
+let c = document.getElementById('canvas');
+let overlay = document.getElementById('overlay');
+let outer = document.getElementById('container');
+
+let ctx = c.getContext('2d');
+let ctxo = overlay.getContext('2d');
+
+let height = c.height;
+let width = c.width;
+let pxCount = height * width;
+
+let floor = Math.floor;
+
+ctx.globalAlpha = 1.0;
+ctx.fillStyle = "#000";
+
+let solidMap = []; // areas drawn solid
+let distanceMap = []; // distance to nearest edge, or zero if in solid area
+let xPosMap = []; // X position of nearest edge
+let yPosMap = []; // Y position of nearest edge
+let xNormMap = []; // normalised dx vector toward nearest edge
+let yNormMap = []; // normalised dy vector toward nearest edge
+for (let i = 0; i < pxCount; i++) {
+  solidMap.push(0);
+  xPosMap.push(0);
+  yPosMap.push(0);
+  xNormMap.push(0);
+  yNormMap.push(0);
+  distanceMap.push(0);
+}
+
+// take +- number, and pin to 0..255
+function pin(v) {
+  if (v > 255) return 255;
+  if (v < 0) return 0;
+  return v;
+}
+
+var com = 4; // 4 components( RGBA )
+var imgBytes = width * height * com;
+var u8a = new Uint8Array(imgBytes); // pixel array
+
+function drawPixelArrayToCanvas() {
+  var UAC = new Uint8ClampedArray(u8a, width, height);
+  var DAT = new ImageData(UAC, width, height);
+  ctx.putImageData(DAT, 0, 0);
+}
+
+function distanceBuffersToPixelArray() {
+  let w = width;
+  let h = height;
+  let rowWidth = w * com; // number of bytes in an image row
+  let ci = 0; // pixel component index
+  let i = 0; // map index
+
+  for (let y = 0; y < h; y++) {
+    let yoff = y * rowWidth;
+    let yi = y * width;
+    for (let x = 0, xoff = 0; x < w; x++, xoff += com) {
+      ci = yoff + xoff;
+      i = yi + x;
+
+      if (solidMap[i] > 0) {
+        u8a[ci + 0] = 0; // Red
+        u8a[ci + 1] = 0; // Green
+        u8a[ci + 2] = 0; // Blue
+        u8a[ci + 3] = 255; // Alpha
+      } else {
+
+        let d = 0 | (255 - Math.log(1 + distanceMap[i]) * 32);
+
+        let cr = pin(((xNormMap[i] + 1) / 2) * d);
+        let cR = pin(((yNormMap[i] + 1) / 2) * d);
+
+        u8a[ci + 0] = cr; // Red
+        u8a[ci + 1] = d; // Green
+        u8a[ci + 2] = cR; // Blue
+        u8a[ci + 3] = 255; // Alpha
+      }
+    }
+  }
+}
+
+// reset arrays before doing jump flood
+function prepareForJumpFlood() {
+  let sqrMaxDist = (height * height) + (width * width);
+  for (let y = 0; y < height; y++) {
+  	let yi = y * width;
+    for (let x = 0; x < width; x++) {
+      let i = yi + x;
+      
+      // set position to X,Y on solid areas, NaN on empty
+      xPosMap[i] = x/solidMap[i];
+      yPosMap[i] = y/solidMap[i];
+    }
+  }
+}
+
+// return the sample index out of the one provided
+// that has the least distance
+function mergeSamples(bestDistance, x, y, current, samples) {
+  let bestSample = current;
+  for (let i = 0; i < samples.length; i++) {
+    let sample = samples[i];
+
+    let dx = x - xPosMap[sample];
+    let dy = y - yPosMap[sample];
+    let thisDist = (dx * dx) + (dy * dy);
+
+    if (thisDist < bestDistance) {
+      bestDistance = thisDist;
+      bestSample = sample;
+    }
+  }
+  return bestSample;
+}
+
+// do a round of jump-flood filling
+let dir = 1;
+let mergeCount = 0;
+function jumpFloodRound(stride) {
+  // for each point, we sample it and 8 neighbors,
+  // keeping only the minimum distance.
+  // We don't need true distance at this point, so
+  // we square but don't square-root.
+
+  // s_ are indexes into xPosMap and yPosMap.
+  // s1 <-stride->  s2  <-stride-> s3
+  // ... stride_y ...
+  // s4 <-stride-> [s5] <-stride-> s6
+  // ... stride_y ...
+  // s7 <-stride->  s8  <-stride-> s9
+
+  let min = Math.min;
+  let max = Math.max;
+  let limit = pxCount - 1;
+  let sqrMaxDist = (height * height) + (width * width);
+  
+  // we alternate directions to take advantage of modifying in place,
+  // and thus re-sampling changes we've made
+	let dy = stride >> 2; // in-place amplifies spreading, so we don't have to touch all pixels at wide stride
+  if (dy < 1) dy = 1;
+  let dx = dy;
+  let y0 = 0;
+  let x0 = 0;
+  if (dir < 0){
+  	dy = -dy;
+    y0 = height - 1;
+    //x0 = width -1;
+  }
+  dir = -dir;
+
+  for (let y = y0; y < height && y >= 0; y+=dy) {
+  	let y1 = (y - stride) * width;
+    let y2 = y * width;
+    let y3 = (y + stride) * width;
+    
+    dx = -dx;
+    x0 = (width - 1) - x0;
+    
+    for (let x = x0; x < width && x >= 0; x+=dx) {
+
+      let r1 = y1 + x;
+      let r2 = y2 + x;
+      let r3 = y3 + x;
+      let i = r2;
+
+      let nextIndex = mergeSamples(sqrMaxDist, x, y, i, [
+        max(r1 - stride, 0), max(r1, 0), max(r1 + stride, 0),
+        max(r2 - stride, 0), r2, min(r2 + stride, limit),
+        min(r3 - stride, limit), min(r3, limit), min(r3 + stride, limit)
+      ]);
+      mergeCount++;
+
+      // update values
+      xPosMap[i] = xPosMap[nextIndex];
+      yPosMap[i] = yPosMap[nextIndex];
+      distanceMap[i] = distanceMap[nextIndex];
+    }
+  }
+
+}
+
+// use jump flood algorithm to find nearest
+// edge for each point in the map.
+function calculateNearestPositions() {
+  prepareForJumpFlood();
+  mergeCount = 0;
+  dir = -1;
+  
+  //jumpFloodRound(4);
+  //jumpFloodRound(4);
+  jumpFloodRound(1);
+  jumpFloodRound(1);
+  
+  let pixelCount = width*height;
+  let samplePerPixel = (mergeCount / pixelCount) * 9;
+  
+  document.getElementById('stats').innerText =
+  `${width}x${height}. ${pixelCount} pixels. ${mergeCount} merges. ${samplePerPixel} samples per pixel`;
+}
+
+// calculate distances based on nearest point
+function calculateDistances() {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let idx = (y * width) + x;
+
+      // these are real distances, so we need to do the math
+      let dx = x - xPosMap[idx];
+      let dy = y - yPosMap[idx];
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      distanceMap[idx] = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist != 0) {
+        xNormMap[idx] = dx / dist;
+        yNormMap[idx] = dy / dist;
+      }
+    }
+  }
+}
+
+function updateDistanceMap() {
+  calculateNearestPositions();
+  calculateDistances();
+}
+
+// render a text string into an int array
+function drawIntoArray(str, size, x,y, target) {
+  var c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  var a = c.getContext('2d');
+  a.fillStyle = "#000";
+  a.fillRect(0, 0, c.width, c.height);
+
+  a.fillStyle = "#fff";
+  a.font = size + 'px monospace';
+  a.fillText(str, x, y + size);
+  var data = a.getImageData(0, 0, c.width, c.height).data;
+  var sz = width * height;
+  for (var i = 0; i < sz; i++) {
+    target[i] = ((data[i * 4] > 100) ? (1) : (target[i]));
+  }
+}
+
+// update and re-draw distance map
+function refreshAll() {
+  updateDistanceMap();
+  distanceBuffersToPixelArray();
+  drawPixelArrayToCanvas();
+}
+
+// draw a circle showing the distance, and a line to the closest edge
+function updateOverlay(x,y){
+  ctxo.clearRect(0, 0, width, height);
+  if (x <= 0 || x >= width) return;
+  if (y <= 0 || y >= height) return;
+  let idx = (y*width) + x;
+  if (solidMap[idx] > 0) return;
+
+  let dist = distanceMap[idx];
+  let tx = xPosMap[idx];
+  let ty = yPosMap[idx];
+  
+  let vx = xNormMap[idx] * 10;
+  let vy = yNormMap[idx] * 10;
+
+	ctxo.strokeStyle = '#fff';
+  ctxo.lineWidth = 1;
+
+	// largest empty circle
+  ctxo.beginPath();
+  ctxo.ellipse(x, y, dist-1, dist-1, Math.PI / 4, 0, 2 * Math.PI);
+  ctxo.stroke();
+
+	// from cursor to nearest point
+  ctxo.beginPath();
+  ctxo.moveTo( x, y);
+  ctxo.lineTo(tx,ty);
+  ctxo.stroke();
+  
+  // fixed length vector to nearest edge
+	ctxo.strokeStyle = '#000';
+  ctxo.lineWidth = 3;
+  ctxo.beginPath();
+  ctxo.moveTo(x   , y   );
+  ctxo.lineTo(x-vx, y-vy);
+  ctxo.stroke();
+}
+
+// click to draw solid areas
+outer.onclick = function(e) {
+  let idx = floor(e.offsetX) + width * floor(e.offsetY);
+  solidMap[idx] = 1;
+  refreshAll();
+};
+let drawMode = false;
+outer.onmousedown = function(e) {
+  drawMode = true;
+  ctxo.clearRect(0, 0, width, height);
+};
+outer.onmouseup = function(e) {
+  drawMode = false;
+};
+outer.onmouseout = function(e) {
+  drawMode = false;
+};
+outer.onmousemove = function(e) {
+	let x = floor(e.offsetX);
+  let y = floor(e.offsetY);
+  let idx = (y*width)+x;
+  if (drawMode) {
+  	// set point to solid, update distance map, redraw all
+  	solidMap[idx] = 1;
+  	refreshAll();
+  } else {
+  	updateOverlay(x,y);
+  }
+}
+
+// add some solid areas, and show an initial overlay for the thumbnail
+drawIntoArray("distance", 64, 5,1, solidMap);
+drawIntoArray("field", 64, 100,80, solidMap);
+refreshAll();
+updateOverlay(50,150);

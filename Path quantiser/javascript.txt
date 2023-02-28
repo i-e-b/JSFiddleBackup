@@ -1,0 +1,32 @@
+
+function quantise() {
+	let inp = document.getElementById("svgPath").value;
+  let out = "temp";
+  
+  let bits = inp.split(/(,| )/);
+  
+  console.dir(bits);
+  for (let i = 0; i < bits.length; i++){
+  	let value = parseFloat(bits[i]);
+  	if (Number.isNaN(value)) continue;
+    
+    // got a number
+    // if it's large, use no decimal places
+    // if small, use fixed significant figures.
+    let size = Math.abs(value);
+    if (size > 99){
+    	bits[i] = ""+(0|value); // truncate to int
+    } else {
+    	let q = value.toPrecision(2); // 2 sig fig
+      let t = 0|value; // truncated
+      
+      if (t == q){ // fraction is zero
+      	bits[i] = ""+t; // truncate to int
+      } else {
+    		bits[i] = ""+q; // 2 sig fig
+      }
+    }
+  }
+  
+  document.getElementById("svgPath").value = bits.join('');
+}

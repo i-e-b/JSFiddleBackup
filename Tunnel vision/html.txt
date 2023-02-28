@@ -1,0 +1,4 @@
+<canvas id="outputCanvas" width ="256" height="256"></canvas>
+<canvas id="rotationCanvas" width ="256" height="256"></canvas>
+<canvas id="depthCanvas" width ="256" height="256"></canvas>
+<canvas id="textureCanvas" width ="256" height="256"></canvas>

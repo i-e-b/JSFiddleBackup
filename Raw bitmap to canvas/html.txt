@@ -1,0 +1,4 @@
+<canvas id="targetCanvas" 
+         width ="512" 
+         height="512">
+</canvas>

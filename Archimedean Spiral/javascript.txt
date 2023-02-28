@@ -1,0 +1,44 @@
+// canvas basics
+var c = document.getElementById('canvas');
+var ctx = c.getContext('2d');
+
+ctx.globalAlpha = 1.0;
+ctx.fillStyle = "#000";
+var h2 = c.height / 2;
+var w2 = c.width / 2;
+var h3 = c.height / 3;
+var w3 = c.width / 3;
+var h8 = c.height / 8;
+var w8 = c.width / 8;
+
+const width = c.width;
+const height = c.height;
+
+function archimedeanPoint(degrees) {
+  const a = 1.0;
+  const b = 9.0;
+  let t = degrees * Math.PI / 180;
+  let r = a + b * t;
+  return {
+    x: (w2 + r * Math.cos(t)),
+    y: (h2 + r * Math.sin(t)),
+    r: r
+  };
+}
+
+var angle = 0.0;
+var step = 0.1;
+const endAngle = 360 * 3;
+
+var count = 0;
+
+while (angle < endAngle && step > 0.0) {
+count++; if (count > 5000) break;
+
+	let p = archimedeanPoint(angle);
+  ctx.fillRect(p.x, p.y, 1, 1);
+  let step = 180 / ((p.r+0.5) * 2);
+  if (step < 0.01) step = 0.01;
+  if (step > 5) step = 5;
+  angle += step;
+}

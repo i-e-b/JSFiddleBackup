@@ -1,0 +1,96 @@
+function log(msg) {
+  document.getElementById('outp').innerText += msg + '\r\n';
+}
+
+let space = [];
+for (let i = 0; i < 40; i++) space.push(0 | (Math.random() * 30));
+space.sort(function(a, b){return a-b});
+
+log(`Search space: (${space.length} items)`);
+log(JSON.stringify(space));
+
+let mbsChecks = 0;
+let stdChecks = 0;
+
+
+function monobound_binary_search(key) {
+  let bot, mid, top;
+
+  if (space.length == 0) {
+    return -2;
+  }
+  bot = 0;
+  top = space.length;
+  let safety = 0;
+
+  while (top > 1  && safety < 100) {
+    safety++;
+    mid = 0|(top / 2);
+
+    mbsChecks++;
+
+    if (key >= space[bot + mid]) {
+      bot += mid;
+    }
+    top -= mid;
+  }
+
+  mbsChecks++;
+
+  if (key == space[bot]) {
+    return bot;
+  }
+  return -1;
+}
+
+function std_binary_search(key) {
+
+  let bot, mid, top;
+
+  if (space.length == 0) {
+    return -2;
+  }
+
+  bot = 0;
+  top = space.length - 1;
+  let safety = 0;
+
+  while (bot < top  && safety < 100) {
+    safety++;
+    mid = 0|(top - (top - bot) / 2);
+
+    stdChecks++;
+
+    if (key < space[mid]) {
+      top = mid - 1;
+    } else {
+      bot = mid;
+    }
+  }
+
+  stdChecks++;
+
+  if (key == space[top]) {
+    return top;
+  }
+
+  stdChecks++;
+
+  if (key == space[bot]) {
+    return bot;
+  }
+  return -1;
+}
+
+
+// find a random targets in the space using both methods
+for (let round = 0; round < 10; round++) {
+  let target = 0 | (Math.random() * 30);
+
+  let mbsFound = monobound_binary_search(target);
+  let stdFound = std_binary_search(target);
+  log(`For ${target}, index = Monobound: ${mbsFound}; standard: ${stdFound}`);
+}
+
+// output total steps
+log(`Monobound: ${mbsChecks} checks; standard: ${stdChecks} checks`);

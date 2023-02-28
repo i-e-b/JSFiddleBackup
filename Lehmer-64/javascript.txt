@@ -1,0 +1,67 @@
+
+// Mask to 64 bits
+const n64 = BigInt("0xFFFFFFFFFFFFFFFF");
+// Mask to 128 bits
+const n128 = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+
+// standard split-mix, used to improve seed
+function splitmix64(state) {
+	let result = BigInt(state);
+  
+	result = (result + BigInt("0x9E3779B97f4A7C15")) & n64;
+	result = (result ^ (result >> BigInt(30)) ) * BigInt("0xBF58476D1CE4E5B9");
+  result = result & n64;
+	result = (result ^ (result >> BigInt(27)) ) * BigInt("0x94D049BB133111EB");
+  result = result & n64;
+	return (result ^ (result >> BigInt(31))) & n64;
+}
+
+// Create a new PRNG state
+function lehmer64_init(seed) {
+	return { state: (splitmix64(seed) << BigInt(64)) + splitmix64(seed+1) };
+}
+
+// Update PRNG state and output next 64 bit value
+function lehmer64_next(state) {
+	let next = state.state * BigInt("0xDA942042E4DD58B5");
+	state.state = next & n128;
+  return (next >> BigInt(64)) & n64;
+}
+
+let outp = document.getElementById("output");
+let seed = new Date().valueOf();
+let state = lehmer64_init(seed);
+
+// Output a few sample values
+for	(var i = 0; i < 20; i++) {
+	outp.innerHTML += lehmer64_next(state).toString(16) + "\n";
+}
+
+// fill a scatter diagram
+let c = document.getElementById('canvas');
+let ctx = c.getContext('2d');
+ctx.globalAlpha = 0.5;
+ctx.fillStyle = "#000";
+let fillCount = c.width * c.height;
+for (var i = 0; i < fillCount; i++) {
+  let x = Number(lehmer64_next(state)) / 0xFFFFFFFFFFFFFFFF;
+  let y = Number(lehmer64_next(state)) / 0xFFFFFFFFFFFFFFFF;
+  
+	ctx.fillRect(x * c.width, y * c.height, 1, 1);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

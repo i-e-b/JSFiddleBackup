@@ -1,0 +1,72 @@
+var com = 4; //:4 components( RGBA )
+var width = 512;
+var height = 512;
+var tot_com = width * height * com; //:total#components
+var u8a = new Uint8Array(tot_com);
+
+
+//:Calculate point in center of canvas:
+var cen_x = width / 2;
+var cen_y = height / 2;
+
+//:Define a circle's radius:
+var rad_c = Math.min(width, height) / 2.1;
+
+RenderImage(u8a, width, height);
+Uint8ArrayToCanvas(u8a, width, height, "targetCanvas");
+
+function Uint8ArrayToCanvas(
+  u8a, //:uint8Array
+  wid, //:width__of_u8a_data_in_pixels
+  hig, //:height_of_u8a_data_in_pixels
+  nam, //:name_id_of_canvas_on_dom
+) {
+
+  // Get canvas element & context
+  var can = document.getElementById(nam);
+  var ctx = can.getContext("2d");
+
+  // Use U8A to create image data object:    
+  var UAC = new Uint8ClampedArray(u8a, wid, hig);
+  var DAT = new ImageData(UAC, wid, hig);
+
+  // Write data into canvas:
+  ctx.putImageData(DAT, 0, 0);
+}
+
+function set(u8a, idx, r, g, b) {
+  u8a[idx + 0] = r; //:Red
+  u8a[idx + 1] = g; //:Green
+  u8a[idx + 2] = b; //:Blue
+  u8a[idx + 3] = 255; //:Alpha
+}
+
+// modify this to change the image
+function renderPixel(u8a, x, y, ci) {
+  // Decide if pixel is inside circle:
+  var dx = (x - cen_x); //:delta_x
+  var dy = (y - cen_y); //:delta_y
+  d = Math.sqrt((dx * dx) + (dy * dy));
+  if (d < rad_c) { //:INSIDE_CIRCLE:
+    set(u8a, ci, 0, 255, 128);
+  } else { //:OUTSIDE_CIRCLE:
+    set(u8a, ci, 64, 0, 128);
+  }
+}
+
+function RenderImage(u8a, w, h) {
+  let rowWidth = w * com; // number of bytes in an image row
+
+
+  //:Make a pattern on array:
+  var d = 0; //:d_is_for_distance
+  var ci = 0; //:Component_Index
+
+  for (let y = 0; y < h; y++) {
+    let yoff = y * rowWidth;
+    for (let x = 0, xoff = 0; x < w; x++, xoff += com) {
+      ci = yoff + xoff;
+      renderPixel(u8a, x, y, ci);
+    }
+  }
+}

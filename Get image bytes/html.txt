@@ -1,0 +1,8 @@
+<!-- we will write here -->
+<canvas id="targetCanvas" 
+         width ="512" 
+         height="512">
+</canvas>
+
+<!-- this is the source. It needs to be either on the same domain or have permissive CORS headers -->
+<img id="color" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Broadway_tower_edit.jpg/800px-Broadway_tower_edit.jpg"/>

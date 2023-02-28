@@ -1,0 +1,309 @@
+'strict';
+
+function log(msg){document.getElementById('outp').innerText+= msg+"\r\n";}
+
+log("Reed solomon coding for short messages\r\n");
+
+/* GF 256 */
+let gf_table = null;
+function gfTable(){
+	if (gf_table) return gf_table;
+  gf_table={exp:Array(256).fill(0), log:Array(512).fill(0)};
+  let x = 1;
+  let prim = 0x11d;
+  
+  for(let i=0; i < 256; i++){
+  	gf_table.exp[i] = x&0xff;
+    gf_table.log[x] = i&0xff;
+    x <<= 1;
+    if (x & 0x100) x ^= prim;
+    x &= 0xff;
+  }
+  for(let i=255; i < 512; i++){
+  	gf_table.exp[i] = gf_table.exp[i-255] & 0xff;
+  }
+  return gf_table;
+}
+function gfAddSub(a,b){return (a^b)&0xff;} // add and subtract are same in GF256
+function gfMul(a,b){
+	if (a == 0 || b == 0) return 0;
+  let gf = gfTable();
+  return gf.exp[gf.log[a] + gf.log[b]];
+}
+function gfDiv(a,b){
+	if (a == 0 || b == 0) return 0;
+  let gf = gfTable();
+  return gf.exp[((gf.log[a]+255) - gf.log[b]) % 255];
+}
+function gfPow(n,p){
+  let gf = gfTable();
+  return gf.exp[(gf.log[n] * p) % 255];
+}
+function gfInverse(n){
+  let gf = gfTable();
+  return gf.exp[255 - gf.log[n]];
+}
+function gfPolyMulScalar(p, sc){// coeff array, scalar
+  let res = Array(p.length).fill(0);
+  for (let i = 0; i < p.length; i++){res[i] = gfMul(p[i], sc);}
+  return res;
+}
+function gfAddPoly(p, q){ // add two polynomials
+	let len = p.length >= q.length ? p.length : q.length;
+  let res = Array(len).fill(0);
+  for (let i = 0; i < p.length; i++){res[i+len - p.length]  = p[i];}
+  for (let i = 0; i < q.length; i++){res[i+len - q.length] ^= q[i];}
+  return res;
+}
+function gfMulPoly(p,q){ // multiply two polynomials
+  let res = Array(p.length + q.length - 1).fill(0);
+	for (let j = 0; j < q.length; j++){
+  	for (let i = 0; i < p.length; i++){
+    	res[i+j] = gfAddSub(res[i+j], gfMul(p[i], q[j]));
+    }
+  }
+  return res;
+}
+function gfEvalPoly(p, x){ // evaluate polynomial 'p' for value 'x', resulting in scalar
+	let y = p[0];
+  for (let i = 1; i < p.length; i++){y = gfMul(y,x) ^ p[i];}
+  return y & 0xff;
+}
+function gfIrreduciblePoly(symCount){
+  let gen = [1];
+  for (let i = 0; i < symCount; i++){
+  	gen = gfMulPoly(gen, [1, gfPow(2, i)]);
+  }
+  return gen;
+}
+
+/* Error correction */
+function removeLeadingZeros(arr){
+	let outp = []; let latch = false;
+	for (let i=0; i<arr.length; i++){
+  	if (!latch && arr[i] == 0) continue;
+    latch = true;
+  	outp.push(arr[i]);
+  }
+  return outp;
+}
+function allZeros(arr){
+	for (let i = 0; i < arr.length; i++){if (arr[i] != 0) return false;}
+  return true;
+}
+function rsCalcSyndromes(msg, sym){
+	let synd = Array(sym+1).fill(0); // with leading zero
+  for (let i = 0; i < sym; i++){synd[i+1] = gfEvalPoly(msg, gfPow(2, i));}
+  return synd;
+}
+function rsErrorLocatorPoly(synd, sym, erases){
+	let errLoc = [1];
+	let oldLoc = [1];
+  
+  let syndShift = 0;
+  if (synd.length > sym) syndShift = synd.length - sym;
+  
+  for (let i = 0; i < (sym-erases); i++){
+  	let kappa = i + syndShift;
+    let delta = synd[kappa];
+    for (let j = 1; j < errLoc.length; j++){
+    	delta ^= gfMul(errLoc[errLoc.length- (j+1)], synd[kappa - j]);
+    }
+    oldLoc.push(0); // ?
+    if (delta != 0){
+    	if (oldLoc.length > errLoc.length){
+      	let newLoc = gfPolyMulScalar(oldLoc, delta);
+        oldLoc = gfPolyMulScalar(errLoc, gfInverse(delta));
+        errLoc = newLoc;
+      }
+      let scale = gfPolyMulScalar(oldLoc, delta);
+      errLoc = gfAddPoly(errLoc, scale);
+    }
+  }
+  
+  errLoc = removeLeadingZeros(errLoc);
+  let errCount = errLoc.length - 1;
+  if (errCount - erases > sym) return 'too many errors';
+  
+  return errLoc;
+}
+function rsFindErrors(locPoly, len){
+	let errs = locPoly.length - 1;
+  let pos = [];
+  
+  for (let i = 0; i < len; i++){
+  	let test = gfEvalPoly(locPoly, gfPow(2, i)) & 0xff;
+    if (test == 0) {
+    	pos.push(len - 1 - i);
+    }
+  }
+  if (pos.length != errs) return 'too many errors';
+  
+  return pos;
+}
+function rsDataErrorLocatorPoly(pos){
+	let eLoc = [1];
+  for (let i = 0; i < pos.length; i++){
+    let add = gfAddPoly([1], [gfPow(2, pos[i]), 0]);
+    eLoc = gfMulPoly(eLoc, add);
+  }
+  return eLoc;
+}
+function rsErrorEvaluator(synd, errLoc, n){
+	let poly = gfMulPoly(synd, errLoc);
+	let len = poly.length - (n+1);
+  for (let i = 0; i < len; i++){
+  	poly[i] = poly[i+len];
+  }
+  poly.length = poly.length - len;
+  return poly;
+}
+function rsCorrectErrors(msg, synd, pos){ // Forney algorithm
+	let len = msg.length;
+	let coeffPos = [];
+  let rSynd = synd.reverse();
+	for (let i = 0; i < pos.length; i++){coeffPos.push(len - 1 - pos[i]);}
+	
+  let errLoc = rsDataErrorLocatorPoly(coeffPos);
+  let errEval = rsErrorEvaluator(rSynd, errLoc, errLoc.length - 1);
+  
+  let chi = [];
+  for (let i = 0; i < coeffPos.length; i++){
+    chi.push(gfPow(2, coeffPos[i]));
+  }
+  
+  let E = Array(len).fill(0);
+  for (let i = 0; i < chi.length; i++){
+  	let tmp = [];
+  	let ichi = gfInverse(chi[i]);
+    for (let j = 0; j < chi.length; j++){
+    	if (i == j) continue;
+      tmp.push(gfAddSub(1, gfMul(ichi, chi[j])));
+    }
+    
+    let prime = 1;
+    for (let k = 0; k < tmp.length; k++){prime = gfMul(prime, tmp[k]);}
+    
+    let y = gfEvalPoly(errEval, ichi);
+    y = gfMul(gfPow(chi[i], 1), y); // pow?
+    let mag = gfDiv(y, prime);
+    E[pos[i]] = mag;
+  }
+	
+  msg = gfAddPoly(msg, E);
+	return msg;
+}
+
+/* data funcs */
+function numToBytes(num){
+	let x = num;
+  let out = [];
+  
+  while (x > 0){
+  	out.unshift(x & 0xff);
+    x = Math.floor(x/0x100); // x >>= 8, but for javascript weirdness
+  }
+  return out;
+}
+function hex(v){ return ("00"+v.toString(16)).slice(-2);}
+function recoverUnique(bytes){
+	return 0x80000000 + (bytes[0]<<24) + (bytes[1]<<16) + (bytes[2]<<8) + bytes[3];
+}
+
+// Main encode function
+// msg should be array of ints in 0..255; sym is number of additional symbols
+function encode(msg, sym){
+	if ((msg.length + sym) > 255) throw new Error('Max output size is 255');
+  
+  let genLength = sym * 2;
+  let gen = gfIrreduciblePoly(sym);
+  let mix = Array(msg.length + gen.length - 1).fill(0);
+  for (let i = 0; i < msg.length; i++) {mix[i]=msg[i];}
+  
+  for (let i = 0; i < msg.length; i++){
+  	let coeff = mix[i];
+    if (coeff == 0) continue;
+    for (let j = 1; j < gen.length; j++){
+    	mix[i+j] ^= gfMul(gen[j], coeff);
+    }
+  }
+  
+  let outp = [];
+  for (let i = 0; i < msg.length + gen.length - 1; i++) outp.push(mix[i]);
+  
+  for (let i = 0; i < msg.length; i++) {outp[i]=msg[i];}
+  
+  return outp;
+}
+
+// Main decode and correct function
+// msg should be the input code; sym is expected number of additional symbols;
+// expectedLength is the expected length of msg -- and should be >= msg.length;
+function decode(msg, sym, expectedLength){
+	let erases = expectedLength - msg.length;
+	let synd = rsCalcSyndromes(msg, sym);
+  if (allZeros(synd)) {
+  	log("no errors found");
+ 		return msg;
+  }
+  log("input has errors");
+  
+  let errPoly = rsErrorLocatorPoly(synd, sym, erases);
+  if (typeof(errPoly) == "string"){return errPoly;} // fail
+  errPoly.reverse();
+  
+  let errorPositions = rsFindErrors(errPoly, msg.length);
+  if (typeof(errorPositions) == "string"){return errorPositions;} // fail
+  
+  errorPositions.reverse();
+  let outp = rsCorrectErrors(msg, synd, errorPositions);
+  
+  // recheck result
+	let synd2 = rsCalcSyndromes(outp, sym);
+  if (allZeros(synd2)) {
+  	log("all errors corrected");
+ 		return outp;
+  }
+  
+  log("failed to correct errors.");
+  log("end    ="+outp.join(' '));
+  
+  return 'too many errors';
+}
+
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
+
+// Notes:
+//    - Using fully numeric decimal codes can quickly cause failure due to
+//      carry propagation, which causes damage to all bytes.
+//    - With octal digits, we can fit 2 into a byte with 2 bits spare.
+//      This gives us a 'spare' byte every 8 input symbols.
+
+const extraCodes = 2; // increase for longer, but more resilient codes
+
+
+let sourceUniqueId = Math.floor(Math.random() * 0x7FFFFFFF + 0x80000000);
+log(`Unique ID = ${sourceUniqueId.toString(16)}`);
+
+let orig = numToBytes(sourceUniqueId - 0x80000000);
+
+log("");
+log("message symbols = "+orig.map(hex).join(''));
+
+
+// encode the original, then damage
+let encoded = encode(orig, extraCodes);
+log("encoded symbols = "+encoded.map(hex).join(''));
+encoded[1] = 255 - encoded[1];
+log("user input      = "+encoded.map(hex).join(''));
+log("");
+
+
+let decoded = decode(encoded, extraCodes, encoded.length);
+if (typeof(decoded) == "string") log(decoded);
+else {
+	log("\r\ndecoded= "+decoded.map(hex).join(''));
+  log(`Unique ID = ${recoverUnique(decoded).toString(16)}`);
+}

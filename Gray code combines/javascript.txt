@@ -1,0 +1,71 @@
+function gray_encode(n) {
+  return n ^ (n >> 1);
+}
+
+// log time branchless (from http://aggregate.org/MAGIC )
+function gray_decode(n) {
+  n ^= (n >> 16);
+  n ^= (n >> 8);
+  n ^= (n >> 4);
+  n ^= (n >> 2);
+  n ^= (n >> 1);
+  return n;
+}
+
+function log(msg){
+	document.getElementById("output").innerHTML+=msg;
+}
+
+log("Gray code combination tests\r\n");
+log("Arithmetic\r\n");
+
+var ba = 23;
+var bb = 501;
+var a = gray_encode(ba);
+var b = gray_encode(bb);
+
+var r = gray_decode(a + b);
+log(`g(${ba}) + g(${bb}) = g(${r});   ${ba}+${bb}=${ba+bb}\r\n`);
+
+var r = gray_decode(a * b);
+log(`g(${ba}) * g(${bb}) = g(${r});  ${ba}*${bb}=${ba*bb}\r\n`);
+
+var r = gray_decode(b - a);
+log(`g(${bb}) - g(${ba}) = g(${r});   ${bb}-${ba}=${bb-ba}\r\n`);
+
+var r = gray_decode(b / a);
+log(`g(${bb}) / g(${ba}) = g(${r});    ${bb}/${ba}=${bb/ba}\r\n`);
+
+log("\r\nBitwise\r\n");
+
+var r = gray_decode(a | b);
+log(`g(${ba}) | g(${bb}) = g(${r});   ${ba}|${bb}=${ba|bb}\r\n`);
+
+var r = gray_decode(a & b);
+log(`g(${ba}) & g(${bb}) = g(${r});     ${ba}&${bb}=${ba&bb}\r\n`);
+
+var r = gray_decode(b ^ a);
+log(`g(${bb}) ^ g(${ba}) = g(${r});   ${bb}^${ba}=${bb^ba}\r\n`);
+
+var r = gray_decode(~a);
+log(`~g(${ba})         = g(${r});    ~${ba}=${~ba}\r\n`);
+
+log("\r\nShifts\r\n");
+
+var r = gray_decode(a << 1);
+log(`g(${ba}) << 1 = g(${r});    ${ba}<<1=${ba<<1}\r\n`);
+
+var r = gray_decode(a << 2);
+log(`g(${ba}) << 2 = g(${r});    ${ba}<<2=${ba<<2}\r\n`);
+
+var r = gray_decode(a << 4);
+log(`g(${ba}) << 4 = g(${r});   ${ba}<<4=${ba<<4}\r\n`);
+
+var r = gray_decode(a >> 1);
+log(`g(${ba}) >> 1 = g(${r});    ${ba}>>1=${ba>>1}\r\n`);
+
+var r = gray_decode(a >> 2);
+log(`g(${ba}) >> 2 = g(${r});     ${ba}>>2=${ba>>2}\r\n`);
+
+var r = gray_decode(a >> 4);
+log(`g(${ba}) >> 4 = g(${r});     ${ba}>>4=${ba>>4}\r\n`);

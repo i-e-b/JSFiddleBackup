@@ -1,0 +1,141 @@
+var com = 4; //:4 components( RGBA )
+var width = 256;
+var height = 256;
+var tot_com = width * height * com; //:total#components
+var texture = new Uint8Array(tot_com);
+var mapV = new Uint8Array(tot_com);
+var mapU = new Uint8Array(tot_com);
+var final = new Uint8Array(tot_com);
+
+let rowWidth = width * com; // number of bytes in an image row
+
+//:Calculate point in center of canvas:
+var cen_x = width / 2;
+var cen_y = height / 2;
+
+let t = 1;
+let previousTimeStamp;
+
+function step(timestamp) {
+	if (previousTimeStamp === undefined) {
+  	previousTimeStamp = timestamp;
+  }
+  t += (timestamp - previousTimeStamp) / 100;
+  
+  if (previousTimeStamp !== timestamp) {
+    RenderToArray(texture, width, height, generateXorPattern);
+    Uint8ArrayToCanvas(texture, width, height, "textureCanvas");
+
+
+    RenderToArray(mapV, width, height, generateDepthPattern);
+    Uint8ArrayToCanvas(mapV, width, height, "depthCanvas");
+
+    RenderToArray(mapU, width, height, generateRotatePattern);
+    Uint8ArrayToCanvas(mapU, width, height, "rotationCanvas");
+
+    RenderToArray(final, width, height, mapTexture);
+    Uint8ArrayToCanvas(final, width, height, "outputCanvas");
+  }
+
+  previousTimeStamp = timestamp;
+  window.requestAnimationFrame(step);
+}
+window.requestAnimationFrame(step);
+
+function Uint8ArrayToCanvas(
+  u8a, //:uint8Array
+  wid, //:width__of_u8a_data_in_pixels
+  hig, //:height_of_u8a_data_in_pixels
+  nam, //:name_id_of_canvas_on_dom
+) {
+
+  // Get canvas element & context
+  var can = document.getElementById(nam);
+  var ctx = can.getContext("2d");
+
+  // Use U8A to create image data object:    
+  var UAC = new Uint8ClampedArray(u8a, wid, hig);
+  var DAT = new ImageData(UAC, wid, hig);
+
+  // Write data into canvas:
+  ctx.putImageData(DAT, 0, 0);
+}
+
+function set(u8a, idx, r, g, b) {
+  u8a[idx + 0] = r; //:Red
+  u8a[idx + 1] = g; //:Green
+  u8a[idx + 2] = b; //:Blue
+  u8a[idx + 3] = 255; //:Alpha
+}
+
+
+function mapTexture(u8a, x, y, ci) {
+	// use 'depth' and 'rotate' buffers
+  // to get u,v coords.  Use these to
+  // look up a value from our texture.
+	let u = mapU[ci];
+	let v = mapV[ci];
+  
+  let idx = (u*rowWidth) + (v*com);
+  let r = texture[idx];
+  let g = texture[idx+1];
+  let b = texture[idx+2];
+  
+  // fade toward the centre
+  // this makes the depth effect more convincing
+  // AND hides the aliasing in the 'depth' map.
+  let dx = x - cen_x;
+  let dy = y - cen_y;
+  let fade = (dx*dx+dy*dy)/2048;
+  if (fade > 1) fade = 1;
+  r *= fade;
+  g *= fade;
+  b *= fade;
+  
+  set(u8a, ci, r, g, b);
+}
+
+function generateRotatePattern(u8a, x, y, ci) {
+  let dx = x - cen_x;
+  let dy = y - cen_y;
+  
+  let c = ((Math.atan2(dy,dx)+3.141593)*40.74 + t) % 256
+  set(u8a, ci, c, c, c);
+}
+
+function generateDepthPattern(u8a, x, y, ci) {
+  let dx = x - cen_x;
+  let dy = y - cen_y;
+  let len = Math.sqrt(dx*dx+dy*dy);
+  
+  let scale = 16384; // the larger this is, the more foreshortening
+  
+  let c = ((1 / len)*scale + (t*4)) % 256;
+  set(u8a, ci, c, c, c);
+}
+
+// modify this to change the image
+function generateXorPattern(u8a, x, y, ci) {
+  let dy = y - cen_y;
+  
+  let r = x ^ y;
+  let g = (x + 64) ^ y;
+  let b = x ^ (y + 64);
+  set(u8a, ci, r, g, b);
+}
+
+function RenderToArray(u8a, w, h, genFunc) {
+
+
+  //:Make a pattern on array:
+  var d = 0; //:d_is_for_distance
+  var ci = 0; //:Component_Index
+
+  for (let y = 0; y < h; y++) {
+    let yoff = y * rowWidth;
+    for (let x = 0, xoff = 0; x < w; x++, xoff += com) {
+      ci = yoff + xoff;
+      genFunc(u8a, x, y, ci);
+    }
+  }
+}

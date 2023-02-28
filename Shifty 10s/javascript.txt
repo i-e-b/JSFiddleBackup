@@ -1,0 +1,53 @@
+function log(m) {
+  document.getElementById('out').innerText += m;
+}
+
+// look-up table for string
+let tabl = ["0","1","2","3","4","5","6","7","8","9"];
+
+
+function divu10(n) {
+  n = 0|n;
+  let q, r;
+  q = (n >> 1) + (n >> 2);
+  q = q + (q >> 4);
+  q = q + (q >> 8);
+  q = q + (q >> 16);
+  q = q >> 3;
+  r = n - (((q << 2) + q) << 1);
+  return 0|(q+((r+6)>>4));
+}
+function mulu10(n){
+	return 0|((n << 1)+(n << 3));
+}
+
+function horribleIntToStr(int){
+	let str = "";
+  let neg = false;
+  if (int < 0) {
+  	neg = true;
+    int = -int;
+  }
+  if(int === 0) return "0";
+
+	while (int > 0){
+    let next = divu10(int);
+    let diff = int - mulu10(next);
+  	str = tabl[diff]+str;
+    int = next;
+  }
+  return (neg) ? ("-"+str) : (str);
+}
+
+
+//for (let i = 0; i < 100000; i+= 101){
+for (let i = 0; i < 1000; i+= 41){
+	let def = 0|(i/10);
+  let sft = divu10(i);
+  if (def !== sft) log('#####');
+  let istr = horribleIntToStr(i);
+  let dstr = ""+i;
+  if (istr != dstr) log('~~~~');
+  
+	log(`i=${dstr} -> ${istr}; i/10=${def}; i./10=${sft}\r\n`);
+}

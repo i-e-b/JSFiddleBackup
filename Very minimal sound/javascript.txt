@@ -1,0 +1,45 @@
+const audioContext = new AudioContext();
+
+let mainGainNode = audioContext.createGain();
+mainGainNode.connect(audioContext.destination);
+mainGainNode.gain.value = 0.1;
+
+let sineTerms = new Float32Array([0.5, -0.5, 1, 0, 1]);
+let cosineTerms = new Float32Array(sineTerms.length);
+let customWaveform = audioContext.createPeriodicWave(cosineTerms, sineTerms);
+
+function play(base, seq, osc) {
+	if (!seq[0]) {
+  	if (osc) osc.stop();
+  	return;
+  }
+
+	let freq = Math.exp(seq[0][0]/8) * base;
+  let time = seq[0][1];
+  seq.shift();
+	
+  if(!osc){
+  	osc = audioContext.createOscillator();
+  	osc.connect(mainGainNode);
+  	osc.setPeriodicWave(customWaveform);
+  	osc.frequency.value = freq;
+  	osc.start();
+  }
+  
+  if (freq > 0){
+  	osc.frequency.value = freq;
+  } else {
+  	osc.stop();
+  }
+  
+  setTimeout(()=>{
+  	play(base, seq, osc);
+  }, time);
+}
+
+let base = 220;
+
+function go(){
+	play(base, [[1,100],[2,100],[3,100],[4,100],[5,100],[6,100],[7,100],[8,400]]);
+	play(base, [[1,700],                                                [8,200],[11,200]]);
+}

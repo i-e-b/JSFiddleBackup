@@ -1,0 +1,21 @@
+
+<canvas id="canvas" style="float:left;" height="400" width="400"></canvas>
+<pre id="output" style="float:left;padding:10px;">Some example values:
+</pre>
+<div style="clear:both;"></div>
+<p>
+An implementation of the <i>lehmer64</i> pseudo-random number generator
+in JavaScript using BigInt.
+This is based on https://github.com/lemire/testingRNG/blob/master/source/lehmer64.h
+</p><p>
+This PRNG gives very good statistical results with very simple code.
+</p><p>
+D. H. Lehmer, Mathematical methods in large-scale computing units.
+Proceedings of a Second Symposium on Large Scale Digital Calculating
+Machinery;
+Annals of the Computation Laboratory, Harvard Univ. 26 (1951), pp. 141-146.
+</p><p>
+P L'Ecuyer,  Tables of linear congruential generators of different sizes and
+good lattice structure. Mathematics of Computation of the American
+Mathematical Society 68.225 (1999): 249-260.
+</p>
