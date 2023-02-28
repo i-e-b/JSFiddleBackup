@@ -1,0 +1,197 @@
+// Function lookup:
+//
+// PING  - Perturb water
+// F  - Math.floor
+// R  - Math.random
+
+// Adjustable Settings:
+var pingStrength = 1e3; // strength of wave from a ping when we start it
+var pingThreshold = 10; // minimum height that registers as ping wave
+var wallThreshold = 10; // minimum height to show wall
+var damping = 2; // 1-10; default 6; lower means pings last longer and go further
+var pixelSize = 2;
+
+// keyboard control of submarine
+var control = {up:false, down:false, left:false, right:false};
+var ctrl2 = {up:false, down:false, left:false, right:false};
+
+// Initialise variables
+var w = 200,// w  - Pixels across
+    h = 200,// h  - Pixels high
+    p = (w*h),// p  - Total pixels
+    x, y, z,// x,y,z  - Temp vars
+    m = [],// m  - First heightmap buffer
+    n = [],// n  - Second heightmap buffer
+    ob = [],// ob - obstacle buffer (0 is wall, 1 is open)
+    acc = [], // accumulator buffer
+    accDrawn = [], // highest value we've drawn (used for draw optimisation)
+    runs = 1, // how recently was a light added (used for calculation opt.)
+    F = Math.floor,
+    flip = false, // should we clear the render?
+    R = Math.random;
+
+// get drawing surface
+var c = document.getElementById("canvas");
+c.width = w * pixelSize;
+c.height = h * pixelSize;
+var d = canvas.getContext("2d");
+
+// clear to black
+d.fillStyle = 'rgb(0,0,0,1)';
+d.fillRect(0, 0, c.width, c.height);
+
+// clear wave buffers
+for (z = p; z--;) {m[z] = n[z] = 0; acc[z]=0; accDrawn[z]=0; ob[z] = 1; }
+
+// draw obstacle buffer
+drawIntoArray('Lites . x [] |', w, 48, ob);
+
+// Tick the simulation and render
+function simulationTick() {
+
+    d.fillStyle = 'rgb(255,255,255,0.1)';
+    // damp the 'top' to reduce reflections
+    for (x=w; x--;){
+        n[x] -= n[x] >> 2;
+        n[x+w] -= n[x+w] >> 4;
+        n[x+w+w] -= n[x+w+w] >> 8;
+    }
+    // Update water height map - see algorithm for explanation
+    for (x = z = (p-w); x--;){
+    
+        // Calculate new value based on previous 2 frames
+        var l = (p + x - 1) % p; // left
+        var r = (x + 1) % p;     // right
+        var a = (p + x - w) % p; // above
+        var b = (x + w) % p;     // below
+        
+        n[x] = ((m[r] + m[l] + m[b] + m[a]) >> 1) - n[x];
+        
+        
+        if (!ob[x]) { // current x is a wall
+            if (Math.abs(n[x]) > wallThreshold) {
+            		// light wall in wall color
+                d.fillRect(x % w * pixelSize, F(x / w) * pixelSize, pixelSize, pixelSize);
+            }
+            n[x] = 0; // suppress, will cause bounce in neigbours
+        } else {
+            // Apply damping. Higher shift = waves go further
+            n[x] -= n[x] >> (10-damping);
+        }
+    }
+    
+    // Swap water buffers over
+    x = m; m = n; n = x; z = p;
+  
+    // Accumulate brightness
+    for (; z>=0; z--) {
+    		// standard lighting
+        let lightLevel = m[z];
+        if (lightLevel > pingThreshold || lightLevel < -pingThreshold) acc[z] += 0.01;
+         // alternate lighting
+        // lightLevel = Math.abs(lightLevel)/100;
+        //acc[z] = Math.max(acc[z], lightLevel);
+    }
+}
+
+function renderLightBuffer(){
+    z=p;
+    
+    // Render pulse wave (slowest part)
+    for (; z>=0; z--) {
+        let lightLevel = acc[z];
+        if (lightLevel < 0.01) continue; // not lit
+        if (lightLevel <= accDrawn[z]) continue; // not brighter since last draw
+        //if (lightLevel > 1.0) {lightLevel = 1.0;}
+        if (lightLevel < 0.0) {lightLevel = 0.0;}
+        
+        /*
+        ((𝑥−1)/((𝑥+1)^4)) +1
+        */
+        let lm1 = lightLevel - 1.0;
+        let lp1 = lightLevel + 1.0;
+        let lp2 = lp1 * lp1;
+        //let lp3 = lp1 * lp2;
+        //let lp4 = lp2 * lp2;
+        
+        lightLevel = (lm1 / lp2) + 1.0;
+        
+    		d.fillStyle = `rgb(${lightLevel*255},${lightLevel*128},${lightLevel*32},1)`;
+        
+        // light ground in ground color
+        d.fillRect(z % w * pixelSize, F(z / w) * pixelSize, pixelSize, pixelSize);
+        accDrawn[z] = acc[z];
+    }
+}
+
+setInterval(function(){
+	if (flip) {
+		d.fillStyle = 'rgb(0,0,0,1)';
+		d.fillRect(0, 0, c.width, c.height);
+  }
+	for (let i = 0; i < runs; i++){
+		simulationTick();
+  }
+  runs =0;// /= 2;
+  
+  if (flip){
+  	renderLightBuffer();
+    flip = false;
+  }
+}, 1000/30);
+
+
+
+function pin(max, v) {
+    var mg = (v.x*v.x)+(v.y*v.y);
+    var sm = (max*max);
+    if (mg < sm) return;
+    var dd = mg / sm;
+    v.x /= dd; v.y /= dd;
+    return mg;
+}
+function drawPt(ctx,pt, szz) {
+    var sz = szz || 0;
+    ctx.fillRect(pt % w * pixelSize, F(pt / w) * pixelSize, pixelSize + sz, pixelSize + sz);
+}
+
+// Strong pressure pulse at point `i`
+function PING(i) {
+		// Clear existing buffers
+		for (z = p; z--;) {m[z] = n[z] = 0; acc[z]=0; accDrawn[z]=0; }
+    // Push down a cross of pixels centered on i
+    // negative starting height gives rounder 'ping'
+    // as we are detecting the positive waves.
+    m[i + 1] = m[i - 1] = m[i + w] = m[i - w] = m[i] = -pingStrength;
+    runs = 100;
+    
+    flip = true;
+}
+
+// Register mouse handler to stir water
+c.onclick = function (e) {
+    PING(F(e.offsetX / pixelSize) + w * F(e.offsetY / pixelSize))
+};
+
+// draw a string into a bool array
+// this is very rough, but give the idea
+function drawIntoArray(str, width, height, target) {
+    var c = document.createElement('canvas');
+    c.width = width;
+    c.height = height;
+    var a = c.getContext( '2d' );
+    a.fillStyle = "#000";
+    a.fillRect(0, 0, c.width, c.height);
+
+    a.fillStyle = "#fff";
+    a.font = (height*0.8) + 'px sans';
+    a.fillText(str, 10, height*0.8);
+    var data = a.getImageData(0, 0, c.width, c.height).data;
+    var sz = width*height;
+    for(var i=0;i<sz;i++) {
+        target[i] = ((data[i*4] > 100) ? (0) : (1));
+    }
+}
+
+// Hit a point to start with
+PING(1020);

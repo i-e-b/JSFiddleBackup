@@ -1,0 +1,21 @@
+let outp = document.getElementById('outp');
+outp.innerText += "[0] = 0,\n[1] = 1,\n";
+
+const limit = 0xFFFFFFFFFFFFFFFF;
+let f = [1,1];
+let i=2;
+
+function estimateIndex(value){
+	var v = 2.078087 * Math.log(value) + 1.672276;
+  return Math.round(v);
+}
+
+while (f[1] <= limit) {
+	let ig = estimateIndex(f[1]);
+  if (ig !== i) ig += "!!!";
+	outp.innerText += "["+i+"] = "+f[1] +"  -> [" + ig +"],\n";
+  i++;
+	let fn = f[0] + f[1];
+	f.shift();
+  f.push(fn);
+}

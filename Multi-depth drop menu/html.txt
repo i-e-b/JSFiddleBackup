@@ -1,0 +1,21 @@
+<label for="StateObject">Filter state:</label>
+<select>
+  <option value="z" class="optionGroup">Any State</option>
+  <option value="z" class="optionGroup">Not in batch</option>
+  
+  <optgroup label=""> <!-- example of a faked separator -->
+    <option style="font-size: 0.5px; background-color: #aaa;" disabled>&nbsp;</option>
+  </optgroup>
+  
+  <optgroup label="">
+    <option value="z" class="optionGroup">Any In Progress</option>
+    <option value="y" class="optionChild">&nbsp;&nbsp;&nbsp;Reclaim sent to Client</option>
+    <option value="x" class="optionChild">&nbsp;&nbsp;&nbsp;and so on...</option>
+  </optgroup>
+  <optgroup label="">
+    <option value="z" class="optionGroup">Any Paid</option>
+    <option value="y" class="optionChild">&nbsp;&nbsp;&nbsp;Partial paid</option>
+    <option value="y" class="optionChild">&nbsp;&nbsp;&nbsp;Paid in full</option>
+    <option value="x" class="optionChild">&nbsp;&nbsp;&nbsp;and so on...</option>
+  </optgroup>
+</select>

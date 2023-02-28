@@ -1,0 +1,65 @@
+<p>Use only 6-character colors (like #RRGGBB)</p>
+<table style="margin:1em">
+  <tr>
+    <td>
+      Text Color</td>
+    <td>
+      <input type="text" id="fgColor" style="font-family:monospace" value="#FFffFF" />
+    </td>
+  </tr>
+  <tr>
+    <td>Background Color</td>
+    <td>
+      <input type="text" id="bgColor" style="font-family:monospace" value="#EA2d02" />
+    </td>
+  </tr>
+</table>
+<div>
+  Your chosen colors:
+  <div id="result" style="padding:10px;font-size:25pt;color:#FFffFF;background-color:#EA2d02">
+    <span style="font-size:25pt;">This is a sample</span>
+    <span style="font-size:12pt;">This is a sample</span>
+    <span style="font-size:8pt;font-family:sans-serif">This is a sample</span>
+  </div>
+</div>
+<div>
+  <div id="blackAndWhite" style="padding:5px;background-color:#EA2d02">
+    <div id="useWhite">
+      <span style="font-size:12pt;color:#fff;">White is more suitable</span>
+      <span style="font-size:12pt;color:#000;">Black is less suitable</span>
+    </div>
+    <div id="useBlack">
+      <span style="font-size:12pt;color:#000;">Black is more suitable</span>
+      <span style="font-size:12pt;color:#fff;">White is less suitable</span>
+    </div>
+  </div>
+</div>
+<div id="recAA" style="margin-top:1em;">
+  Similar colors meeting W3C AA standard (4.5:1)
+  <div id="resultAA" style="padding:10px;font-size:25pt;color:#FFffFF;background-color:#EA2d02">
+    <span style="font-size:25pt;">This is a sample</span>
+    <span style="font-size:12pt;">This is a sample</span>
+    <span style="font-size:8pt;font-family:sans-serif">This is a sample</span>
+    <br /><span style="font-size:10pt;font-family:monospace" id="recAA_style"></span>
+  </div>
+</div>
+<div id="recAA_meet" style="display:none">Your colors meet W3C AA standard (4.5:1)</div>
+<div id="recAAA" style="margin-top:1em;">
+  Similar colors meeting W3C AAA standard (7:1)
+  <div id="resultAAA" style="padding:10px;font-size:25pt;color:#FFffFF;background-color:#EA2d02">
+    <span style="font-size:25pt;">This is a sample</span>
+    <span style="font-size:12pt;">This is a sample</span>
+    <span style="font-size:8pt;font-family:sans-serif">This is a sample</span>
+    <br /><span style="font-size:10pt;font-family:monospace" id="recAAA_style"></span>
+  </div>
+</div>
+<div id="recAAA_meet" style="display:none">Your colors meet W3C AAA standard (7:1)</div>
+
+<p style="margin-top:1em;">
+  Analysis: </p>
+<pre id="analysis">wait...</pre>
+
+<p>Pallette variations</p>
+<div id="variants">
+
+</div>

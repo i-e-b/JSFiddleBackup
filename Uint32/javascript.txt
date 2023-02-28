@@ -1,0 +1,34 @@
+function log(msg){
+	document.getElementById('outp').innerText += msg+'\r\n';
+}
+
+log("Test");
+
+var uint32 = new Uint32Array(4);
+uint32[0] = 0x80000000;
+uint32[1] = 0xFFFFFFFF;
+uint32[2] = 2;
+
+log(uint32[0]);
+log(uint32[1]);
+
+// float form
+// (a + b) / 2
+let result = (uint32[0] + uint32[1]) / 2.0;
+log("Average: "+result);
+
+
+// simple form
+// (a + b) / 2
+uint32[3] = (uint32[0] + uint32[1]) / uint32[2];
+log("Average: "+uint32[3]);
+
+// 'SWAR' (see https://devblogs.microsoft.com/oldnewthing/20220207-00/?p=106223 )
+// (a & b) + (a ^ b) / 2
+uint32[3] = (uint32[0] & uint32[1]) + (uint32[0] ^ uint32[1]) / uint32[2];
+log("Average: "+uint32[3]);
+
+// MPEG form (Roney S. Wong)
+// (a / 2) + (b / 2) + (a & b & 1)
+uint32[3] = (uint32[0] / uint32[2]) + (uint32[1] / uint32[2]) + (uint32[0] & uint32[1] & 1);
+log("Average: "+uint32[3]);

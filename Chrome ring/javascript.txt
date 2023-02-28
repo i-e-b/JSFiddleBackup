@@ -1,0 +1,52 @@
+
+var c = document.querySelector("#c");
+        
+c.width = 800;
+c.height = 600;
+var x = c.getContext("2d");
+    
+
+var playing = true;
+var FPS = 60;
+    var time = 0;
+    var frame = 0;
+    var nextFrameMs = 0;
+    var S = Math.sin;
+    var C = Math.cos;
+    var T = Math.tan;
+    function R(r,g,b,a) {
+      a = a === undefined ? 1 : a;
+      return "rgba("+(r|0)+","+(g|0)+","+(b|0)+","+a+")";
+    }
+
+
+function u(t) {
+
+var px=960+S(t/=2)*400+R*t;
+var py=580+C(t)*400+Math.abs(R=T(t));
+x.fillRect(px*0.1,py*0.1,R,S(t)/R)
+
+}
+
+
+
+
+function loop(frame_time) {
+  if (playing){
+    requestAnimationFrame(loop);
+    epsilon = 1.5; // Acounts for different timestamp resolution and slight jitter
+    if (frame_time < nextFrameMs - epsilon) {
+      return;  // Skip this cycle as we are animating too quickly.
+    }
+    nextFrameMs = Math.max(nextFrameMs + 1000 / FPS, frame_time);
+  }
+      
+  time = frame/FPS;
+  if(time * FPS | 0 == frame - 1){
+    time += 0.000001;
+  }
+  frame++;
+      
+	u(time);
+}
+loop(0);

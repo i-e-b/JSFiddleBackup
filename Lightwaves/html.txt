@@ -1,0 +1,4 @@
+<p>Click to place a light. Lighting propagates through a simple fluid simulation.</p>
+<div id="container">
+    <canvas id="canvas" class="subcanvs"></canvas>
+</div>

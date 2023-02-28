@@ -1,0 +1,259 @@
+let bgColor = document.getElementById('bgColor');
+let fgColor = document.getElementById('fgColor');
+let result = document.getElementById('result');
+let analysis = document.getElementById('analysis');
+let variants = document.getElementById('variants');
+let blackAndWhite = document.getElementById('blackAndWhite');
+let useBlack = document.getElementById('useBlack');
+let useWhite = document.getElementById('useWhite');
+let recAA = document.getElementById('recAA');
+let recAAA = document.getElementById('recAAA');
+let recAAMet = document.getElementById('recAA_meet');
+let recAAAMet = document.getElementById('recAAA_meet');
+let resultAA = document.getElementById('resultAA');
+let resultAAA = document.getElementById('resultAAA');
+let styleAA = document.getElementById('recAA_style');
+let styleAAA = document.getElementById('recAAA_style');
+
+function abs(x) {return Math.abs(x);}
+function pow(x,y) {return Math.pow(x,y);}
+function sqrt(x) {return Math.sqrt(x);}
+function linearRgbToLab(r,g,b)
+{
+	// Transform 1
+  var l = 0.4121656120 * r + 0.5362752080 * g + 0.0514575653 * b;
+  var m = 0.2118591070 * r + 0.6807189584 * g + 0.1074065790 * b;
+  var s = 0.0883097947 * r + 0.2818474174 * g + 0.6302613616 * b;
+
+	// 'Oklab' correction
+  var cubeRoot = 1.0 / 3.0;
+  var l_ = pow(l, cubeRoot);
+  var m_ = pow(m, cubeRoot);
+  var s_ = pow(s, cubeRoot);
+
+	// Transform 2
+	return {
+  	cL : 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+  	ca : 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+  	cb : 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+  }
+}
+function Oklab_To_LinearRGB(cL, ca, cb)
+{
+  var l_ = cL + 0.3963377774 * ca + 0.2158037573 * cb;
+  var m_ = cL - 0.1055613458 * ca - 0.0638541728 * cb;
+  var s_ = cL - 0.0894841775 * ca - 1.2914855480 * cb;
+
+  var l = l_*l_*l_;
+  var m = m_*m_*m_;
+  var s = s_*s_*s_;
+
+	return {
+  	r: LinearToSrgb(+4.0767245293 * l - 3.3072168827 * m + 0.2307590544 * s),
+  	g: LinearToSrgb(-1.2681437731 * l + 2.6093323231 * m - 0.3411344290 * s),
+  	b: LinearToSrgb(-0.0041119885 * l - 0.7034763098 * m + 1.7068625689 * s)
+  }
+}
+
+function hex(num) {
+    var str = (0|num).toString(16);
+    return str.length == 1 ? "0" + str : str;
+};
+function sRgbToLinear(v){
+	return v <= 0.04045
+         ? v / 12.92
+         : pow((v + 0.055) / 1.055, 2.4);
+}
+function pin255(v) {if(v>255)return 255;if(v<0)return 0; return v;}
+function LinearToSrgb(v){
+  const inv = 1.0 / 2.4;
+  const ams = 0.055 - (1 - 0.99999999999999989); // should be 0.055, but this adjusts for floating point error
+  return v <= 0.0031308
+    ? 0|pin255(v * 12.92 * 255 + 0.5)
+  	: 0|pin255((1.055 * pow(v, inv) - ams) * 255);
+}
+function adjustColor(Lab, dv){
+	var x = Oklab_To_LinearRGB(Lab.cL + dv, Lab.ca, Lab.cb);
+  return "#"+ hex(x.r) + hex(x.g) + hex(x.b);
+}
+
+function RefreshVariants(bgLab,fgLab){
+	variants.innerHTML = "";
+  for	(let i = -10; i <= 10; i+=3){
+  	
+    let back = adjustColor(bgLab, i/50);
+    for	(let j = -10; j <= 10; j+=2){
+      let fore = adjustColor(fgLab, j/50);
+      variants.innerHTML += `<div id="result" style="float:left;margin:3px;padding:10px;font-size:10pt;font-family:monospace;color:${fore};background-color:${back}">FG:${fore} BG:${back}</div>`;
+    }
+  }
+	
+}
+
+function w3cLinear(v){
+	var x = v / 255.0;
+	return (x <= 0.03928) ? x/12.92 : pow((x+0.055)/1.055, 2.4);
+}
+function w3cLuminance(r,g,b){
+	return (
+  	  0.2126 * w3cLinear(r)
+    + 0.7152 * w3cLinear(g)
+    + 0.0722 * w3cLinear(b)
+  );
+}
+function w3cRatio(r1,g1,b1,  r2,g2,b2){
+// https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio
+// https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
+
+	let a = w3cLuminance(r1,g1,b1);
+	let b = w3cLuminance(r2,g2,b2);
+	return calcRatio(a,b);
+}
+function calcRatio(L1, L2){
+	let darker  = (L1 > L2) ? L2 : L1;
+	let lighter = (L1 > L2) ? L1 : L2;
+  
+  let raw = (lighter + 0.05) / (darker + 0.05);
+  return (0|(raw * 100)) / 100;
+} 
+
+function findNextBest(fgLab,bgLab, target){
+
+	var a = {}
+	var b = {};
+  var currentRatio = 0;
+  var vary = fgLab.cL > bgLab.cL ? 0.0001 : -0.0001;
+  var variance = 0;
+  
+  var limit=0;
+  do {
+  
+		a = Oklab_To_LinearRGB(fgLab.cL + variance, fgLab.ca, fgLab.cb);
+		b = Oklab_To_LinearRGB(bgLab.cL - variance, bgLab.ca, bgLab.cb);
+  	currentRatio = w3cRatio(a.r,a.g,a.b,  b.r,b.g,b.b);
+    
+    // search further if we're having trouble
+    if (limit == 50) vary *= 2;
+    if (limit == 100) vary *= 2;
+    if (limit == 200) vary *= 4;
+    if (limit == 300) vary *= 8;
+    variance += vary;
+    limit++;
+  } while (currentRatio <= target && limit < 1000)
+  
+  if (limit >= 1000) console.log("Abandoned search for "+target+":1");
+  
+  return {
+  	fore: a,
+    back: b
+  };
+}
+
+function UpdateAnalysis(){
+	var bg_r = parseInt("0x" + bgColor.value.substring(1,3));
+  var bg_g = parseInt("0x" + bgColor.value.substring(3,5));
+	var bg_b = parseInt("0x" + bgColor.value.substring(5,7));
+  
+	var fg_r = parseInt("0x" + fgColor.value.substring(1,3));
+  var fg_g = parseInt("0x" + fgColor.value.substring(3,5));
+	var fg_b = parseInt("0x" + fgColor.value.substring(5,7));
+
+	var bgLab = linearRgbToLab(
+  	sRgbToLinear(bg_r/255),
+  	sRgbToLinear(bg_g/255),
+  	sRgbToLinear(bg_b/255)
+  );
+  
+	var fgLab = linearRgbToLab(
+  	sRgbToLinear(fg_r/255),
+  	sRgbToLinear(fg_g/255),
+  	sRgbToLinear(fg_b/255)
+  );
+  
+  var cdiff_a = pow(fgLab.ca - bgLab.ca, 2);
+  var cdiff_b = pow(fgLab.cb - bgLab.cb, 2);
+  var ldiff = pow(fgLab.cL - bgLab.cL, 2);
+  
+  var cdist = 0|(sqrt(cdiff_a + cdiff_b) * 100);
+  var contrast = 0|(sqrt(ldiff) * 100 );
+  var colorContrast = 0|(sqrt(cdiff_a + cdiff_b + ldiff) * 100);
+  
+  var w3cApprox = calcRatio(fgLab.cL, bgLab.cL);
+  var w3cExact = w3cRatio(bg_r,bg_g,bg_b, fg_r,fg_g,fg_b);
+  
+  // find the nearst color that's 4.5:1 and 7:1
+  var next4p5 = findNextBest(fgLab, bgLab, 4.5);
+  var next7p0 = findNextBest(fgLab, bgLab, 7.0);
+  
+  // show the samples only if we don't meet the standard
+  recAA.style.display = w3cExact >= 4.5 ? "none" : "inherit";
+  recAAMet.style.display = w3cExact >= 4.5 ? "inherit" : "none";
+  recAAA.style.display = w3cExact >= 7 ? "none" : "inherit";
+  recAAAMet.style.display = w3cExact >= 7 ? "inherit" : "none";
+  
+  let AAbg = "#"+ hex(next4p5.back.r) + hex(next4p5.back.g) + hex(next4p5.back.b);
+  let AAfg = "#"+ hex(next4p5.fore.r) + hex(next4p5.fore.g) + hex(next4p5.fore.b);
+  resultAA.style.backgroundColor = AAbg;
+  resultAA.style.color = AAfg;
+  
+  let AAAbg = "#"+ hex(next7p0.back.r) + hex(next7p0.back.g) + hex(next7p0.back.b);
+  let AAAfg = "#"+ hex(next7p0.fore.r) + hex(next7p0.fore.g) + hex(next7p0.fore.b);
+  resultAAA.style.backgroundColor = AAAbg;
+  resultAAA.style.color = AAAfg;
+  
+  styleAA.innerText = `color:${AAfg};background-color:${AAbg};`;
+  styleAAA.innerText = `color:${AAAfg};background-color:${AAAbg};`;
+  
+  // Decide if white or black text goes better with this background, and show
+  // the appropriate message
+  var blackOnBackground = w3cRatio(bg_r,bg_g,bg_b, 128,0,0); // slight bias against black-on-red
+  var whiteOnBackground = w3cRatio(bg_r,bg_g,bg_b, 255,255,255);
+  if (blackOnBackground > whiteOnBackground){
+  	useBlack.style.display = "inherit";
+  	useWhite.style.display = "none";
+  } else {
+  	useBlack.style.display = "none";
+  	useWhite.style.display = "inherit";
+  }
+  
+  
+	analysis.innerText =
+  	"\nLuminance Contrast = " + contrast + "% (AA = 40% ; AAA = 54%)"+
+  	"\nColor Contrast     = " + colorContrast + "% (only applies to trichromate vision)"+
+    "\n"+
+  	"\nW3C contrast ratio = " + w3cExact + ":1 (AA = 4.5:1 ; AAA = 7:1)"+
+  	"\nOklab ratio        = " + w3cApprox + ":1 (AA = 1.6:1 ; AAA = 1.95:1)"+
+    "\n"+
+  	"\nColor distance     = " + cdist +"% (over 25% might clash)"+
+    "\n"+
+    "\nNearest 4.5:1 colors :  (w3c AA)"+
+    "\n          Foreground = "+AAfg+
+    "\n          Background = "+AAbg+
+    "\n"+
+    "\nNearest 7:1 colors   :  (w3c AAA)"+
+    "\n          Foreground = "+ AAAfg+
+    "\n          Background = "+ AAAbg+
+    "\n"+
+  	"\nBackground: "+JSON.stringify(bgLab)+
+    "\nForeground: " +JSON.stringify(fgLab);
+  
+  RefreshVariants(bgLab,fgLab);
+}
+
+
+function updateBgColor(){
+	result.style.backgroundColor = bgColor.value;
+  blackAndWhite.style.backgroundColor = bgColor.value;
+  UpdateAnalysis();
+}
+
+function updateFgColor(){
+	result.style.color = fgColor.value;
+  UpdateAnalysis();
+}
+
+bgColor.addEventListener("change", updateBgColor, false);
+fgColor.addEventListener("change", updateFgColor, false);
+
+// trigger once on page load:
+UpdateAnalysis();

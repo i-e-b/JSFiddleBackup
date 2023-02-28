@@ -1,0 +1,38 @@
+let canvas = document.getElementById('canvas');
+let context = canvas.getContext('2d');
+let   video = document.getElementById("video"),
+      btnStart = document.getElementById("start"),
+      btnStop = document.getElementById("stop"),
+      btnPhoto = document.getElementById("snap");
+
+
+// Prefer camera resolution nearest to 1280x720
+let constraints = { audio: false, video: { width: 1280, height: 720 } };
+var localMediaStream;
+
+
+btnStart.addEventListener("click", function() {
+  if (localMediaStream) {
+	video.play();
+	return;
+  }
+  // Need to set-up the video feed
+  navigator.mediaDevices.getUserMedia(constraints).then(function(mediaStream) {
+	  localMediaStream = mediaStream;
+	  video.srcObject = mediaStream;
+	  video.onloadedmetadata = function(e) {
+		video.play();
+	  };
+	})
+	.catch(function(err) { console.log(err.name + ": " + err.message); });
+});
+
+
+btnStop.addEventListener("click", function() {
+  video.pause();
+});
+
+btnPhoto.addEventListener("click", function() {
+  // Capture video to canvas directly
+  context.drawImage(video, 0, 0, 320, 180);
+});

@@ -1,0 +1,9 @@
+let test = "cipnthjtxhnegdd\"/}:{!']^`[()^`";
+
+function x(str){return str.split('').map(s=>{
+let j = s.charCodeAt(0);
+return (j < 48 || j > 57) && (j < 65 || j > 90) && (j < 97 || j > 122) ? "&#"+s.charCodeAt(0)+";" : s;
+}).join('');}
+
+document.getElementById("output").innerHTML = x(test) + "<br/>";
+document.getElementById("output").innerText += x(test);

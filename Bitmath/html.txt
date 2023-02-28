@@ -1,0 +1,2 @@
+<pre id="outp"></pre>
+<p>Requires bitwise operations: <small>AND, XOR, SHL</small></p>

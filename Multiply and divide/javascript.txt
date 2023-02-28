@@ -1,0 +1,73 @@
+function log(m){document.getElementById("outp").innerText+=m+"\n";}
+
+log("Old multiply and divide from  http://map.grauw.nl/articles/mult_div_shifts.php");
+log("and https://clrhome.org/table/");
+log("------------------------------------------------------------------------------");
+
+// multiply by rotate right:
+function mul_rr(a,b){
+  let neg = 1; // sign flip.
+  if (a < 0) {a = -a; neg = -neg;} // the algorithm only works on natural numbers
+  if (b < 0) {b = -b; neg = -neg;}
+	let result = 0;
+  let md = b;
+  let mr = a;
+  
+  let loopCount = 0;
+  
+  while (mr !== 0) { // while there are still bits set in the multiplier
+    if (mr & 1) result += md; // if right most bit is set, add multiplicand
+
+    mr >>= 1; // shift multiplier right (divide 2)
+    md <<= 1; // shift multiplicand left (multiply 2)
+    
+    loopCount++;
+  }
+  
+  console.log(`${a}*${b} looped ${loopCount} times`);
+  
+  return result*neg;
+}
+
+function bitsIn(x) {
+	let i = 0;
+  while (x !== 0) {i++;x = x >>> 1;}
+  return i;
+}
+
+// Divide by subtraction
+// returns {quo: floor(a/b), mod: (a%b)}
+// This always gives a positive 'mod' value. If negative, that means a failure.
+function div_sub(a,b){
+	if (b === 0) return {quo: 0, mod: -1};
+  let neg = 1; // sign flip.
+  if (a < 0) {a = -a; neg = -neg;} // the algorithm only works on natural numbers
+  if (b < 0) {b = -b; neg = -neg;}
+  
+  let quotient = 0;
+  let remainder = 0;
+  
+  let n = bitsIn(a);
+  for (let i = n-1; i >= 0; i--) {
+  	remainder <<= 1;  // shift remainder
+    remainder |= (a >> i) & 1; // set the bottom bit of remainder to bit i of the numerator
+    
+    if (remainder >= b) {
+    	remainder -= b;
+      quotient |= 1 << i;  // set bit in quotient
+    }
+  }
+
+	return {quo:quotient*neg, mod:remainder};
+}
+
+
+for (let i = 0; i < 30; i++){
+	let scale = (i * i * i) + 10;
+	let x = 0|((Math.random()-0.5) * scale);
+	let y = 1|((Math.random()-0.5) * 250);
+  
+	log(`calc ${x} * ${y} = ${mul_rr(x,y)} (${(x*y)})`);
+  let d=div_sub(x,y);
+	log(`     ${x} / ${y} = ${d.quo} R${d.mod} (${(x/y)|0} R${(x%y)})`);
+}

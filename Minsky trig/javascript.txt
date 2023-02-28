@@ -1,0 +1,39 @@
+// canvas basics
+var c = document.getElementById('canvas');
+var ctx = c.getContext('2d');
+
+ctx.globalAlpha = 1.0;
+ctx.fillStyle = "#000";
+var h2 = c.height / 2;
+var w2 = c.width / 2;
+var h3 = c.height / 3;
+var w3 = c.width / 3;
+var h8 = c.height / 8;
+var w8 = c.width / 8;
+
+
+var steps = 0;
+var step = 0.0001; // much smaller than this and we hit float issues
+
+// start with a trivial unit vector
+var sin = 0.0;
+var cos = 1.0;
+
+while (sin >= 0){
+	ctx.fillRect((cos * h3) + h2, w2 + (sin * w3), 1, 1);
+	ctx.fillRect((cos * h3) + h2, w2 - (sin * w3), 1, 1);
+  
+  // This is a rotation, where sin(θ) == step.
+  // For very small θ, sin(θ) == θ; so we can assume we
+  // are rotating by 'step' radians per iteration.
+	cn = cos - (sin * step);
+  sn = sin + (cos * step);
+  cos = cn;
+  sin = sn;
+  if (sin >= 0) steps ++;
+}
+
+
+var pi_guess = steps * step;
+ctx.font="14px sans";
+ctx.fillText("Pi ~ "+pi_guess, w8, h8);

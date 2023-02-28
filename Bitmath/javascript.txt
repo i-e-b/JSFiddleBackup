@@ -1,0 +1,43 @@
+let outp = document.getElementById('outp');
+
+function l(msg) {
+  outp.innerText += msg + "\n";
+}
+
+function p5(msg) {
+  return ("     " + msg).slice(-5)
+}
+
+l("  A  |  B  | A+B | A-B ")
+
+function add(a, b) {
+	let x = a, y = b;
+  let i = 0
+  if (a < 0) {let t = a; a = b; b = t;}
+  do {
+    let sum = a ^ b;
+    let carry = a & b;
+    a = sum;
+    b = carry << 1;
+    i++;
+  } while (b != 0);
+
+  console.log(x+"+"+y+" -> "+i + " iters");
+  return a;
+}
+
+function neg(a) { // two's compliment
+  return add(~a, 1);
+}
+
+function sub(a, b) {
+  return add(a, neg(b));
+}
+
+for (var i = 0; i < 10; i++) {
+  let scale = (i * i * i) + 10;
+  let x = 0 | ((Math.random() - 0.5) * scale);
+  let y = 1 | ((Math.random() - 0.5) * 250);
+
+  l(`${p5(x)}|${p5(y)}|${p5(add(x,y))}|${p5(sub(x,y))}    -> ${p5(x+y)}|${p5(x-y)}`)
+}

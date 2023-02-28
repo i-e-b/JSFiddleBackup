@@ -1,0 +1,6 @@
+let input = "Åbjørn says \u212B \u00C5 \u0041\u030A";
+
+let form = input.normalize('NFKD').split('');
+
+
+document.getElementById("outp").innerText = input + "\r\n->\r\n" +JSON.stringify(form);

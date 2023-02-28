@@ -1,0 +1,102 @@
+// canvas basics
+var c = document.getElementById('canvas');
+var ctx = c.getContext('2d');
+ctx.globalAlpha = 0.5;
+ctx.fillStyle = "#000";
+
+// Text output
+function log(msg) {
+  document.getElementById('out').innerText += msg;
+}
+
+// complex math
+function cmplx(r, i) {
+  return {
+    r: r,
+    i: i
+  }
+}
+
+function ComplexFromPolar(arg, abs) {
+  let real = Math.cos(arg) * abs;
+  let imaginary = Math.sin(arg) * abs;
+  return cmplx(real, imaginary);
+}
+
+function mul(a, b) {
+  let real = a.r * b.r - a.i * b.i;
+  let imaginary = a.r * b.i + a.r * b.i;
+  return cmplx(real, imaginary);
+}
+
+function add(a, b) {
+  return cmplx(a.r + b.r, a.i + b.i);
+}
+
+function sub(a, b) {
+  return cmplx(a.r - b.r, a.i - b.i);
+}
+
+function atan(a) {
+  return Math.atan2(a.i, a.r);
+}
+
+function abs(a) {
+  return Math.sqrt(a.r * a.r + a.i * a.i);
+}
+
+function div(a, b) {
+  let angle = atan(a) - atan(b);
+  let length = abs(a) / abs(b);
+  return ComplexFromPolar(angle, length);
+}
+
+function pow(a, p) {
+  let angle = atan(a) * p;
+  let length = abs(a) ** p;
+  return ComplexFromPolar(angle, length);
+}
+
+// Lattès' example
+function step(z) {
+  /*
+          (z² + 1)²      <- numer
+  f(z) = ------------
+          4z(z² - 1)     <- denom
+  */
+  let one = cmplx(1, 0);
+  let four = cmplx(4, 0);
+  let numer = pow(add(mul(z, z), one), 2);
+  let denom = mul(mul(z, four), sub(mul(z, z), one));
+  if (abs(denom) === 0) denom = one;
+  return div(numer, denom);
+}
+
+// PRNG based on iterating over the example
+let seed = cmplx(10, 150); // any pair of numbers can work as the seed
+function next() {
+  for (var i = 0; i < 10; i++) {
+    seed = step(seed);
+    seed.i += 10; // reduce bias by getting off of circular paths
+  }
+  let output = seed.r - (seed.r | 0);
+  if (output < 0) output = -output;
+  return output;
+}
+
+// Run some iterations both into text log and the canvas
+
+for (var i = 0; i < 25; i++) { // text
+  let output = next();
+  log(`${output}        ${seed.r},${seed.i}\n`);
+}
+
+let fillCount = c.width * c.height;
+log(fillCount)
+for (var i = 0; i < fillCount; i++) { //canvas
+	
+  let x = next(seed);
+  let y = next(seed);
+  
+	ctx.fillRect(x * c.width, y * c.height, 1, 1);
+}

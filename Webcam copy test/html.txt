@@ -1,0 +1,7 @@
+
+<button id="start">Start video</button>
+<button id="stop">Stop video</button>
+<button id="snap">Snap Photo</button>
+<br/>
+<video id="video" width="320" height="200" autoplay></video>
+<canvas id="canvas" width="640" height="480"></canvas>

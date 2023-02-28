@@ -1,0 +1,9 @@
+<div class="stacked-radial-1">Overlapping radial gradients simulating a conic gradient</div>
+
+<div class="stacked-radial-2">Radial gradients with cutoffs, showing as spots</div>
+
+<div class="stacked-linear-1">Overlapping linear gradients</div>
+
+<div class="stacked-linear-2">Banded linear gradients</div>
+
+<div class="stacked-linear-3">Circle with lines attempt</div>
