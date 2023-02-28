@@ -1,0 +1,375 @@
+// canvas basics
+var c = document.getElementById('canvas');
+var ctx = c.getContext('2d');
+var screenWidth = c.width;
+var screenHeight = c.height;
+
+// The canvas where we draw the gravity field
+var fieldCanvas = document.createElement('canvas');
+fieldCanvas.width = screenWidth;
+fieldCanvas.height = screenHeight;
+var gfld = fieldCanvas.getContext('2d');
+gfld.globalCompositeOperation = "copy";
+gfld.fillStyle = "#7f7f7f"; // zero vector
+gfld.fillRect(0, 0, screenWidth, screenHeight);
+
+// twiddle factors:
+var speedScale = 0.02; // affects speed. smaller values = slower
+var solarSystem = 1; // 1 = solar system, 0 = all masses free
+var frameRate = 30; // fps
+var dustLimit = 2000; // to limit cpu load
+var bulletLimit = 8;
+var levelNum = 1;
+var startingMass = 1; // the mass of the asteroids. Goes up in higher levels.
+
+// player state
+var started = false;
+var totalScore = 0;
+var livesRemain = 5;
+var control = {};
+var ship = { // it's us!
+	x:400, y:400, dx:0, dy:0, m:0.2,
+  ddx: 0, ddy: -1, // heading
+  invulnerable: (frameRate * 3) // new ship shields
+};
+
+// x,y position; dx,dy velocity; mass on an 0..1 scale
+var asteroids = [];
+var bullets = []; // holds our weapon fire
+var dust = []; // objects that don't add to the gravity field, but are affected by it
+createNewLevel();
+
+// gravity canvas -- a vector field pointing in, centred on 20,20
+// Red is dx, with -1..1 mapped to 0..255
+// Green is dy, same mapping. Blue is unused at present
+var gravCanv = CalculateField (1, 0.09);
+// thrust canvas -- a vector field pointing out, centred on 20,20
+var thrustCanv = CalculateField (-1, 0);
+
+//copy from offscreen to main.
+
+var i = 0;
+setInterval(frameFunc, 1000 / frameRate);
+
+function frameFunc() {
+	// clear the visible canvas
+	ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+	ctx.fillStyle = "#000"; // black background
+	ctx.fillRect(0, 0, screenWidth, screenHeight); // comment this out to see the vector field
+  if (asteroids.length - solarSystem < 1) { // end of level
+  	startingMass++;
+    levelNum++
+    createNewLevel();
+    newShip();
+  }
+  
+  if (!started) {
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 1;
+    ctx.font="26px sans bold";
+    ctx.fillText("Level "+levelNum,(screenWidth/2) - 120,(screenHeight / 2)-30);
+    ctx.fillText("Press any key to start",(screenWidth/2) - 120,screenHeight / 2);
+    return;
+  }
+
+	// Clear gravity field
+  gfld.globalCompositeOperation = "source-over";
+  gfld.globalAlpha =1;
+	gfld.fillStyle = "#7f7f7f"; // zero vector
+	gfld.fillRect(0, 0, screenWidth, screenHeight);
+  
+  if (livesRemain > 0) { controlShip();}
+	if (dust.length > dustLimit) {dust.shift();}
+  
+	// Add all massive objects
+	gfld.globalCompositeOperation = "overlay"; // helps prevent issues with draw order
+  for (i=0; i < asteroids.length;i++) {setGravity(asteroids[i]);}
+  if (livesRemain > 0) { setGravity(ship); }
+  
+  // update velocity based on gravity field, then update position based on velocity
+  for (i=solarSystem; i < asteroids.length;i++) {applyForces(asteroids[i]);}
+  for (i=0; i < dust.length;i++) {applyForces(dust[i]);}
+  for (i=0; i < bullets.length;i++) {applyForces(bullets[i]);}
+  applyForces(ship);
+  
+  hitTestAll();
+  ageBullets();
+  ageDust();
+  
+  // Done writing to AND reading from the gravity field.
+  // Now draw into the visible field
+  
+  // draw the asteroids
+  ctx.globalAlpha = 1.0;
+  if (solarSystem) {
+  	var o = asteroids[0];
+    var r = asteradius(o);
+    var hr = r/2;
+		ctx.fillStyle = "#fd0";
+		ctx.fillRect(o.x-hr, o.y-hr, r, r);
+  }
+	ctx.fillStyle = "#ddd";
+  for (i=solarSystem; i < asteroids.length;i++) {
+  	var o = asteroids[i];
+    var r = asteradius(o);
+    var hr = r/2;
+		ctx.fillRect(o.x-hr, o.y-hr, r, r);
+	}
+  // draw dust
+  ctx.globalAlpha = 0.2;
+	ctx.fillStyle = "#fff";
+  for (i=0; i < dust.length;i++) {
+  	var o = dust[i];
+		ctx.fillRect(o.x, o.y, o.heat, o.heat);
+	}
+  // draw bullets
+  ctx.globalAlpha = 1.0;
+	ctx.fillStyle = "#f0f";
+  for (i=0; i < bullets.length;i++) {
+  	var o = bullets[i];
+		ctx.fillRect(o.x, o.y, 2, 2);
+	}
+  
+  // draw the ship
+  if (livesRemain > 0) {
+    drawShip();
+
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 0.7;
+    ctx.font="16px sans bold";
+    ctx.fillText("Score: "+totalScore,5,16);
+    ctx.fillText("Lives: "+livesRemain,5,32);
+  } else { // game over screen
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 1;
+    ctx.font="26px sans bold";
+    ctx.fillText("Game Over",(screenWidth/2) - 120,screenHeight / 2);
+    ctx.fillText("Score: "+totalScore,(screenWidth/2) - 120,(screenHeight / 2)+30);
+  }
+}
+
+
+// -------------------------------------------------------------------------//
+// -------------------------------------------------------------------------//
+// -------------------------------------------------------------------------//
+
+function controlShip(){
+  	if (ship.invulnerable>0) {ship.invulnerable--;}
+    if (control.left) {rotateShip(-0.1);}
+    if (control.right) {rotateShip(0.1);}
+    if (control.up) {
+      gfld.globalAlpha =1;
+      gfld.globalCompositeOperation = "source-over";
+      gfld.drawImage(thrustCanv, 0, 0, 41, 41, // vector source
+          ship.x-40-ship.ddx, ship.y-40-ship.ddy, 80, 80); // dst
+    }
+    if (control.fire){
+      control.fire = false;
+      if (bullets.length < bulletLimit) {
+        bullets.push({x:ship.x, y:ship.y,
+        dx:ship.dx+ship.ddx*200, dy:ship.dy+ship.ddy*200, m:0.1, age:0});
+      }
+    }
+}
+function ageDust() {
+	for (var v=0; v < dust.length;v++) {
+  	dust[v].heat = Math.max(2, (dust[v].heat || 6) - 0.2);
+  }
+}
+function ageBullets() {
+	for (var v=bullets.length-1; v >= 0;v--) {
+  	bullets[v].age++;
+    if (bullets[v].age > 50) {bullets.splice(v, 1);}
+  }
+}
+function newShip(){
+  ship.x = screenWidth / 2;
+  ship.y = screenHeight / 2;
+  ship.dx = 0; ship.dy = 0;
+  ship.ddx = 0; ship.ddy = -1;
+  ship.invulnerable = frameRate * 3;
+}
+function hitTestAll() {
+  var roid_rm = [];
+  for (var u = solarSystem; u < asteroids.length; u++) { //note, can't remove sun
+  	var roid = asteroids[u];
+    var r = asteradius(roid) / 2;
+    var t = roid.y - r;
+    var l = roid.x - r;
+    var b = roid.y + r;
+    var r = roid.x + r;
+    var bul_rm = [];
+    for (var v=0; v < bullets.length;v++) {
+    	var o = bullets[v];
+    	if (o.x>l && o.x<r && o.y>t && o.y<b){
+      	// hit! Store the bullet and asteroid index to handle later.
+      	bul_rm.push(v);
+        roid_rm.push(u)
+      }
+    }
+    // now test ship
+    if (ship.invulnerable<=0 && ship.x>l && ship.x<r && ship.y>t && ship.y<b) {
+    	livesRemain--;
+    	dustSpew(ship.x, ship.y, 100, 10);
+      newShip();
+    }
+  	for(i=0;i<bul_rm.length;i++)bullets.splice(bul_rm[i], 1);
+  }
+  // split roid, add dust
+  for(i=0;i<roid_rm.length;i++) {
+  	var old = asteroids[roid_rm[i]];
+    totalScore += Math.ceil(100 / old.m); // smaller ones are harder to hit
+  	asteroids.splice(roid_rm[i], 1); // remove the asteroid
+    if (old.m > 0.3) { // new small asteroids
+    	asteroids.push({
+        x:old.x, y:old.y,
+        dx:old.dx + rand(150), dy:old.dy + rand(150),
+        m:old.m / 2});
+    	asteroids.push({
+        x:old.x, y:old.y,
+        dx:old.dx + rand(150), dy:old.dy + rand(150),
+        m:old.m / 2});
+    }
+    dustSpew(old.x, old.y, old.m * 100, 6);
+  }
+}
+function dustSpew(x,y,count,heat){
+  for (var v = 0; v < count; v++){
+    dust.push({x:x, y:y,dx:rand(heat*10), dy:rand(heat*10),m:0.1, heat:heat});
+  }
+}
+function rand(scale){
+	return (Math.random() * scale * 2)-scale;
+}
+function asteradius(ast){return ast.m * 40;}
+function drawShip() {
+	var d90 = 1.57079632679;
+  var ny = ship.ddx * Math.sin(d90) + ship.ddy * Math.cos(d90);
+	var nx = ship.ddx * Math.cos(d90) + (ship.ddy * -Math.sin(d90));
+  
+  if (ship.invulnerable > 0) {
+		ctx.fillStyle = "#90f";
+  } else {
+		ctx.fillStyle = "#fff";
+  }
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.moveTo(ship.x+(ship.ddx*20), ship.y+(ship.ddy*20));
+  ctx.lineTo(ship.x+(nx*8), ship.y+(ny*8));
+  ctx.lineTo(ship.x-(nx*8), ship.y-(ny*8));
+  ctx.closePath();
+  ctx.fill();
+}
+function rotateShip(theta) {
+  var ny = ship.ddx * Math.sin(theta) + ship.ddy * Math.cos(theta);
+	var nx = ship.ddx * Math.cos(theta) + (ship.ddy * -Math.sin(theta));
+  ship.ddx = nx;
+  ship.ddy = ny;
+}
+function setGravity(o){
+	var s = o.m * 160;
+  gfld.globalAlpha = o.m;
+  var wx=0,wy=0;
+  for (var wy = -screenHeight; wy <= screenHeight; wy+=screenHeight) {
+  	// hack: we draw each mass several times to deal with the wrapping.
+    // TODO: make this smarter, so it's only done where needed.
+    for (var wx = -screenWidth; wx <= screenWidth; wx+=screenWidth) {
+    	gfld.drawImage(gravCanv, 0, 0, 41, 41, // vector source
+        o.x - s + wx, o.y - s + wy, s*2, s*2); // dst
+    }
+  }
+}
+
+function applyForces(o) {
+  	var f = getGravity(o.x, o.y); // TODO: optimise se we don't have to load data every time?
+    o.dx += f.dx / o.m; // force from field reduced by inertia
+    o.dy += f.dy / o.m;
+    o.x += o.dx * speedScale;
+    o.y += o.dy * speedScale;
+    if (o.x < 0) o.x += screenWidth;
+    if (o.x > screenWidth) o.x -= screenWidth;
+    if (o.y < 0) o.y += screenHeight;
+    if (o.y > screenHeight) o.y -= screenHeight;
+}
+
+function getGravity(x,y) {
+  var data = gfld.getImageData(x, y, 1, 1).data;
+  if (!data) return {dx:0, dy:0};
+  return {dy : ((data[0] - 127) / 127),
+  			  dx : ((data[1] - 127) / 127)};
+}
+
+function CalculateField (sign, thresh) {
+	var canv = document.createElement('canvas');
+	canv.width = 41; canv.height = 41;
+  var scale = 127 / 20;
+  var osc = canv.getContext('2d');
+  var imgdata = osc.getImageData(0,0, 41, 41);
+  var dist,x,y,idx;
+  for (y = 0; y < 41; y++) {
+    for (x = 0; x < 41; x++) {
+      idx = (x + y * imgdata.width) * 4;
+      var dx = ((sign > 0) ? (20 - x) : (x - 20)) / 20; // -1..1
+      var dy = ((sign > 0) ? (20 - y) : (y - 20)) / 20; // -1..1
+      dist = Math.sqrt(dy*dy + dx*dx); // 0..1
+      var fx = dx / (dist / 20); // force direction
+      var fy = dy / (dist / 20);
+      if (dist > thresh) {
+        imgdata.data[idx+0] = 127 + (fy * scale);
+        imgdata.data[idx+1] = 127 + (fx * scale);
+        imgdata.data[idx+2] = 127;
+        imgdata.data[idx+3] = 255 * (1 - dist); // force strength
+      } else {
+        // centre is zero
+        imgdata.data[idx+0] = imgdata.data[idx+1] = imgdata.data[idx+2] = 127;
+        imgdata.data[idx+3] = 0;
+      }
+    }
+  }
+  osc.putImageData(imgdata,0,0);
+  return canv;
+}
+function createNewLevel() {
+	solarSystem = Math.floor(Math.random()*1.99);
+	asteroids = [];
+  dust = [];
+  bullets = []
+  started = false;
+  var hx = screenWidth / 2;
+  var hy = screenHeight / 2;
+  if (solarSystem) {
+  	asteroids.push({x:hx+rand(100),  y:hy+rand(100),  dx:0, dy:0, m: 1.0});
+  }
+  var levelMass = 0;
+  while (levelMass < startingMass) {
+  	var nm = (3*Math.random() + 1) / 4;
+    levelMass += nm;
+  	asteroids.push({x:hx+rand(hx),  y:hy+rand(hy),  dx:rand(10), dy:rand(10), m: nm});
+  }
+}
+
+document.onkeydown = function(e){
+    e = e || window.event;
+    if (e.keyCode == '38') {control.up = true;}
+    else if (e.keyCode == '40') {control.down=true;}
+    else if (e.keyCode == '37') {control.left=true;}
+    else if (e.keyCode == '39') {control.right=true;}
+    else if (e.keyCode == '32' || e.keyCode == '13') {control.fire=true;}
+    else {console.log(e.keyCode);}
+    
+    started = true;
+    e.stopPropagation(); e.preventDefault();
+    return false;
+};
+document.onkeyup = function(e){
+    e = e || window.event;
+    if (e.keyCode == '38') {control.up = false;}
+    else if (e.keyCode == '40') {control.down=false;}
+    else if (e.keyCode == '37') {control.left=false;}
+    else if (e.keyCode == '39') {control.right=false;}
+    else if (e.keyCode == '32' || e.keyCode == '13') {control.fire=false;}
+    
+    e.stopPropagation(); e.preventDefault();
+    return false;
+};

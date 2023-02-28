@@ -1,0 +1,8 @@
+<form>
+Base: <input id="base" value="hello" /><br/>
+Target: <input id="target" value="world"/><br/>
+Iteration: <input id="iter" value="1"/><br/>
+<a href="javascript:make()">Make</a>
+</form>
+<b>Encoded:</b>
+<pre id="outstr"></pre>

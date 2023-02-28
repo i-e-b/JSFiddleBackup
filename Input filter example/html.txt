@@ -1,0 +1,5 @@
+<input type="email" id="target" value="hello@test.com" style="width:40em" />
+
+<!-- This fiddle shows a filter that works on desktop and mobile devices
+     And on all text-like input type. The filter method is ugly and flickers,
+     but is consistent and functional. -->

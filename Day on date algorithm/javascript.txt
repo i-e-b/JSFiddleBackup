@@ -1,0 +1,22 @@
+var DayOfWeek=[
+	"Sunday",
+	"Monday",
+	"Tuesday",
+	"Wednesday",
+	"Thursday",
+	"Friday",
+	"Saturday"
+]
+
+function GetDayOfWeek(year, month, day)
+{
+	var monthAdjust = [ 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 ];
+	year -= (month < 3) ? 1 : 0;
+  var leap = Math.floor(year / 4);
+  var greg = Math.floor(year / 100);
+  var modern = Math.floor(year / 400);
+
+	return DayOfWeek[(year + leap - greg + modern + monthAdjust[month - 1] + day) % 7];
+}
+
+document.getElementById('outp').innerText = `Day on 2016-02-25: ${GetDayOfWeek(2016,2,25)}`;

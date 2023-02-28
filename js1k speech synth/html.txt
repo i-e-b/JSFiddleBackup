@@ -1,0 +1,1 @@
+<h1>1K JavaScript Speech Synthesizer<input id=d value="dis iz a spiiitch sinthESaeizar in oan kee. taip jour tekSt and pres entar." style="position:fixed;background:transparent;top:0;left:0;width:99%;height:99%">

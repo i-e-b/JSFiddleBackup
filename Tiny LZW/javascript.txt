@@ -1,0 +1,64 @@
+// Minified LZW compression and expansion. Demo at bottom.
+// Correct enough for strict mode:
+"use strict";
+
+// Encode string to compressed string (142 chars)
+function z(s){var D={},r='',c,p=s[0],C=256,i=1;do{c=s[i++];p=D[p+c]?p+c:(r+=(p[1]?String.fromCharCode(D[p]):p),D[p+c]=C++,c)}while(c)return r}
+
+// Decode compressed string to original (142 chars)
+function Z(s){var D={},c=s[0],o=c,r=c,C=256,p,x,i=0;while(x=s[++i]){x=x.charCodeAt();r+=p=x<256?s[i]:D[x]||o+c;D[C++]=o+(c=p[0]);o=p}return r}
+
+
+// Now let's explain what's happening
+function compressor_full(s){
+    var D={}, // this will be a dictionary of back-references
+        r='', // result string
+        c, // next character to write
+        p=s[0], // current char / lookback dictionary key. start at first char
+        C=256, // writeback offset -- outside ASCII scope. Any code point here or after is a back reference. This compressor won't handle Unicode input.
+        i=1; // next char to look at, start at second char
+    do{
+        c=s[i++]; // read next char
+        
+        p = D[p+c]? // if lookback contains key and current char, don't output.
+            p+c: // grow lookback key, else
+        (
+            r+=(p[1]?String.fromCharCode(D[p]):p),// write lookback location or char. If `p` has more than one char (p[1] would be defined) this is a dictionary entry. `charCodeAt` has no argument to save a character.
+            D[p+c]=C++,// write to lookback, output position update 
+            c// reset key
+        );
+    }while(c); // run out of characters
+    return r; // convert int array to a string
+}
+
+function decoder_full(s){
+    var D={}, // expansion dictionary
+        c=s[0], // trailing char
+        o=c, // backreference string
+        r=c, // array of chars (output)
+        C=256, // lookback marker
+        p, // last block written
+        x, // integer of current char
+        i=0; // index
+    while(x=s[++i]){ // advance and check if we reached end of input
+        x=x.charCodeAt(); // get int for the char
+        r+= // write to output, and set p (last output) to...
+            p=( x<256 ? // if (normal ascii char)
+               s[i]: // then (write that char)
+               D[x]||o+c); // else it's in the dictionary. If that lookup fails, write the backreference built so far (first occurence of back reference)
+        D[C++]=o+(c=p[0]); // advance count, write backref, move trailing char.
+        o=p; // continue to build backreference (might include reset)
+    }
+    return r;// char array back to string
+}
+
+
+// Demo
+var outp = document.getElementById("t");
+var input = "FOUR SCORE AND SEVEN YEARS AGO OUR FATHERS BROUGHT FORTH ON THIS CONTINENT A NEW NATION CONCEIVED IN LIBERTY AND DEDICATED TO THE PROPOSITION THAT ALL MEN ARE CREATED EQUAL...";
+var encoded = z(input);
+var decoded = Z(encoded);
+var result = (input == decoded) ? "PASS" : "FAIL";
+outp.innerHTML += [result,input,encoded,decoded].join("<br/><br/>");
+outp.innerHTML += "<br/><br/>Input chars: "+input.length+", compressed chars: "+
+    encoded.length+" ("+(((encoded.length/input.length)*100) | 0)+"%)";

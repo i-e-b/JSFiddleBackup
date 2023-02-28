@@ -1,0 +1,24 @@
+// just for play
+
+var codeStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234789!*&@#";
+
+function make() {
+	var iter  = parseInt(document.getElementById("iter").value);
+	var base  = document.getElementById("base").value;
+	var targ  = document.getElementById("target").value;
+  
+  var bx = base.charCodeAt(iter % base.length);
+  var tx = targ.charCodeAt(0);
+  var i = iter + tx + bx + targ.length;
+  var outp = "";
+  for (var x = 0; x < 13; x++) {
+    var cP = i % codeStr.length;
+    outp += codeStr[cP];
+    bx += (cP % 2) ? 1 : 0;
+    tx += (cP % 2) ? 1 : 0;
+    i += base.charCodeAt(bx % base.length) + targ.charCodeAt(tx % targ.length);
+  }
+  
+  document.getElementById("outstr").innerText += "\r\n" + outp
+}
+window.make = make;

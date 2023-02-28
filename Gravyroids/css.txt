@@ -1,0 +1,6 @@
+/*
+Instructions:
+
+Arrows move. Space to fire.
+Destroy asteroids. Don't die.
+*/

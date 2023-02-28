@@ -1,0 +1,11 @@
+/* The idea of this one is "missile command" game as keyboard practice. Incoming missiles each get a dictionary word (each with a unique start char).
+Typing 'aims' on the missile. Completing the name of the missile fires to destroy it.
+
+You can't swap to another missile without destroying the current one.
+
+TODO/ Ideas:
+ - Lives -- maximum number of hits before end of game
+ - Levels/waves. Each new wave sets a higher minimum difficulty and adds a few more words to the mix
+ - Bonus rounds. Can't lose lifes, lots of random letters OR numbers (letters and numbers are different bonus rounds)
+
+*/

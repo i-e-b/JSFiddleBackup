@@ -1,0 +1,18 @@
+span {
+  font-size: 20px;
+  font-family: sans-serif;
+  font-weight: 800;
+  display: inline-block;
+  overflow: display;
+  height: 26px;
+}
+.borderUnderlineClass {
+  border-bottom: 3px solid #000;
+}
+.insetShadowClass {
+  box-shadow: inset 0px -3px 0px 0px black;
+}
+.shadow2 {
+  box-shadow: inset 0px -3px 0px 0px black;
+  text-shadow: 2px 0px 1px #fff, -2px 0px 1px #fff;
+}

@@ -1,0 +1,297 @@
+/*
+
+Simple formant speech synth.
+
+Based on http://heckmeck.de/demoscene/tiny-speech-synth-js/ (credits at bottom)
+Similar to the one at https://jsfiddle.net/i_e_b/7x91ajpn
+but not minified
+
+Available phonemes:
+|------ vowels ------|  |--------------------- consonants -----------------------|
+a, e, E, i, y, w, o, u, b, d, f, g, h, k, l, m, n, p, r, s, S, c, t, T, v, z, Z, K
+
+'th's:
+	Z is like 'th' in 'this'
+	S is like 'th' in 'breath'
+	T is a soft voiced 'th' like 'the'
+c is always a soft 'c'
+K is 'ch' like in 'church'
+voiced s is 'z'
+E is the soft 'uh/eh' sound English uses for many vowels.
+
+"This thing is the best catch" -> "Zis Sing iz TEE bEEst katK"
+*/
+
+
+var SAMPLE_FREQUENCY = 44100;
+var PI               = Math.PI;
+var PI_2             = 2*PI;
+
+// Auxiliary functions
+function CutLevel ( x,  lvl ) {
+	if ( x > lvl )
+		return lvl;
+	if ( x < -lvl )
+		return -lvl;
+	return x;
+}
+
+// These are the voice tones. Has a big impact on the sound
+function BaseVocalform ( x ) {
+	// sawtooth. Classic 'machine voice'
+  //return (((x*4)%40) / 20) - 1;
+  
+  // Square wave. Try playing with duty cycle
+  //return ((x%40) < 10) ? 1.0 : -1.0;
+  
+  // Spike wave. Try playing with duty cycle
+  let p = x%40;
+  if (p < 3) return 1.0;
+  if (p < 5) return -1.0;
+  let px = (0|(p / 4)) % 3;
+  return px - 0.5;
+  //return p < 3 ? 1.0 : (p < 5 ? -1.0 : 0.0);
+  
+  // Flattened sine. Sounds quite metallic
+  //var v = Math.sin(x/2)*2;
+  //return (v>0)?v-1:-v;
+  
+  // wobble sine. Sounds woody.
+  //return Math.sin(x)*Math.cos(2*x);
+  
+  //return Math.sin(x); // pure sine doen't work, as it has no overtones. Try it and see
+}
+
+var g_phonemes = {
+	'o': { f:[12,  15], w:[ 10,  10], len:3, amp: 6, osc:0, plosive:0, open:1 },
+	'i': { f:[ 5,  56], w:[ 10,  10], len:3, amp: 3, osc:0, plosive:0, open:1 },
+	'y': { f:[ 5,  56], w:[ 10,  10], len:1, amp: 3, osc:0, plosive:0, open:1 },
+	'E': { f:[20,  40], w:[ 10,  10], len:2, amp:12, osc:0, plosive:0, open:1 },
+	'a': { f:[18,  30], w:[ 10,  10], len:3, amp:15, osc:0, plosive:0, open:1 },
+	'e': { f:[14,  50], w:[ 10,  10], len:3, amp:15, osc:0, plosive:0, open:1 },
+	'u': { f:[ 5,  14], w:[ 10,  10], len:3, amp: 3, osc:0, plosive:0, open:1 },
+	'w': { f:[ 3,  14], w:[ 10,  10], len:3, amp: 1, osc:0, plosive:0, open:1 },
+  
+	'v': { f:[ 2,  20,  0], w:[ 20,  10,  0], len:3, amp: 3, osc:0, plosive:0, open:0 },
+	'T': { f:[ 2,  20,  0], w:[ 40,   1,  0], len:3, amp: 5, osc:0, plosive:0, open:0 },
+	'z': { f:[ 5,  28, 80], w:[ 10,   5, 10], len:3, amp: 3, osc:0, plosive:0, open:0 },
+	'Z': { f:[ 4,  30, 60], w:[ 50,   1,  5], len:3, amp: 5, osc:0, plosive:0, open:0 },
+	'b': { f:[ 4,   0,  0], w:[ 10,   0,  0], len:1, amp: 2, osc:0, plosive:0, open:0 },
+	'd': { f:[ 4,  40, 80], w:[ 10,  10, 10], len:1, amp: 2, osc:0, plosive:0, open:0 },
+	'm': { f:[ 4,  20,  0], w:[ 10,  10,  0], len:3, amp: 2, osc:0, plosive:0, open:0 },
+	'n': { f:[ 4,  40,  0], w:[ 10,  10,  0], len:3, amp: 2, osc:0, plosive:0, open:0 },
+	'r': { f:[ 3,  10, 20], w:[ 30,   8,  1], len:3, amp: 3, osc:0, plosive:0, open:0 },
+	'l': { f:[ 8,  20,  0], w:[ 10,  10,  0], len:3, amp: 5, osc:0, plosive:0, open:0 },
+	'g': { f:[ 2,  10, 26], w:[ 15,   5,  2], len:2, amp: 1, osc:0, plosive:0, open:0 },
+	'f': { f:[ 8,  20, 34], w:[ 10,  10, 10], len:3, amp: 4, osc:1, plosive:0, open:0 },
+	'h': { f:[22,  26, 32], w:[ 30,  10, 30], len:1, amp:10, osc:1, plosive:0, open:0 },
+	's': { f:[80, 110,  0], w:[ 80,  40,  0], len:3, amp: 5, osc:1, plosive:0, open:0 },
+	'S': { f:[20,  30,  0], w:[100, 100,  0], len:3, amp:10, osc:1, plosive:0, open:0 },
+	'c': { f:[20,  30,  0], w:[100, 100,  0], len:1, amp:10, osc:1, plosive:0, open:0 },
+	'p': { f:[ 4,  10, 20], w:[  5,  10, 10], len:1, amp: 4, osc:1, plosive:1, open:0 },
+	't': { f:[ 4,  20, 40], w:[ 10,  20,  5], len:1, amp: 3, osc:1, plosive:1, open:0 },
+	'k': { f:[20,  80,  0], w:[ 10,  10,  0], len:1, amp: 3, osc:1, plosive:1, open:0 },
+	'K': { f:[ 4,  20, 40], w:[ 10,  20,  5], len:3, amp: 8, osc:1, plosive:0, open:0 }
+};
+
+
+// Synthesizes speech and adds it to specified buffer
+function SynthSpeech ( buf, text, f0, speed, bufPos, blend, blendRate, whisper, nasal, smooth) {
+	var s = 0; // sample position inside phoneme component
+  var os = 0;
+	var x; // sample value.
+	var startBuf = bufPos;
+	// Debug
+	var minBuf = 0,maxBuf = 0;
+  // last two sample values:
+	var buf1Res = 0, buf2Res = 0;
+  
+  // bandpass parameters
+  var freq = 0;
+  var q = 0;
+ 	var v = 0; // amplitude at sample position
+  var oldV = 0;
+  var Tv = 0;
+  var wordStart = true;
+  var oldFreq = [0,0,0];
+  var oldQ = [0,0,0];
+    
+	// Loop through all phonemes
+  wordStart = true;
+	for (var textPos=0; textPos<text.length; textPos++) {
+		var l = text.charAt(textPos);
+    
+		// Find phoneme description
+		var p = g_phonemes[l];
+		if (!p) {
+			if (" ".indexOf(l) >= 0) { // tiny pause characters
+				bufPos += Math.floor(SAMPLE_FREQUENCY * 0.1 * speed);
+      	wordStart = true;
+			} else if (",\n\r".indexOf(l) >= 0) { // short pause characters
+				bufPos += Math.floor(SAMPLE_FREQUENCY * 0.2 * speed);
+      	wordStart = true;
+			} else if (l == ".") { // long pause for period
+				bufPos += Math.floor(SAMPLE_FREQUENCY * 0.7 * speed);
+      	wordStart = true;
+      } else if (l == "\\") { // drop tone
+      	f0 -= 10;
+      } else if (l == "/") { // raise tone
+      	f0 += 10;
+      }
+			continue; // next phoneme
+		}
+    oldV = Tv;
+		Tv = p.amp;
+		var sl = p.len * (SAMPLE_FREQUENCY / 15) * speed;
+    if (textPos < text.length - 1) {
+    	var nextChar = text.charAt(textPos+1) 
+      if (nextChar == l) { // double char -> double sound length
+        textPos++;
+        sl *= 2;
+      }
+    }
+
+    var Tfreq = 0;
+    var Tq = 0;
+		var thisBufPos = bufPos;
+    os = s;
+      
+		// Generate sound
+		for ( var f = 0; f < p.f.length; f++ ) { // for each component...
+			var ff = p.f[f]; // relative frequency of component
+			if ( !ff ) {
+        oldFreq[f] = oldFreq[f-1];
+        oldQ[f] = oldQ[f-1];
+      	continue; // skip empty components
+      }
+      
+      // sound's target primary power band
+			var Tfreq = ff*(50/SAMPLE_FREQUENCY);
+      
+      // Target secondary power band (low pass)
+			var Tq = 1.0 - p.w[f] * (PI * 15 / SAMPLE_FREQUENCY);
+            
+      thisBufPos = bufPos; // rewind to overplay the new component
+      s = os;							 //     averaged with the other components
+      
+			for ( ds = 0; ds < sl; ds++ ) { // build samples
+        if (blend && !wordStart) { // blend in new parameters
+        	var brate = (p.osc*4) + 2; // higher means faster blends.
+          var b_new = Math.min(1, ((ds*brate) / sl));
+          var b_old = 1.0 - b_new;
+          freq = (b_old * oldFreq[f]) + (b_new * Tfreq);
+          q = (b_old * oldQ[f]) + (b_new * Tq);
+          v = (b_old * oldV) + (b_new * Tv);
+        } else { // blending off: jump straight to the next sound
+        	freq = Tfreq; q = Tq; v = Tv;
+        }
+        
+        s += (f0 * PI_2 / SAMPLE_FREQUENCY);
+        
+        // We fill the sample with either noise or a 'vocal' waveform
+        // The vocal waveform must have lots of frequency components we
+        // can apply the filter to. Squares and sawtooths work well.
+        // Sines work exceptionally badly.
+				if ( !p.osc && !whisper) {
+					x = BaseVocalform(s); // base frequency
+        	x += (Math.random() - 0.5)*0.5;
+				} else {
+        	x = (Math.random() - 0.5)*2;
+        }
+        
+        var tap2 = 2 * Math.cos ( PI_2 * freq ) * q;
+        var tap1 = 1;
+        var tap3 = q * q;
+        if (nasal) { tap1 = 1 - tap2; tap3 = q; }
+        
+				// Apply formant filter.
+        // this works as a very rough 3-tap bandpass filter.
+				x = (tap1 * x) + (tap2 * buf1Res) - (tap3 * buf2Res);
+        
+        // move sample window
+				buf2Res = buf1Res;
+				buf1Res = x;
+        
+        
+				// Anticlick function. Fades out the edges of each phoneme
+        // reduces the clicks and pops of the rough algorithm,
+        // but can introduce some odd harmonics
+				if (smooth) {x *= CutLevel (edgef(ds / sl ), 1);}
+				x = (x * v) * 2;
+        
+        var lastBV = buf[thisBufPos];
+        var thisBV = (lastBV+lastBV + x) / 3; 
+				buf[thisBufPos] = thisBV; // left
+				buf[thisBufPos+1] = thisBV; // right
+        thisBufPos += 2;
+				if (thisBV < minBuf) minBuf = thisBV 
+				if (thisBV > maxBuf) maxBuf = thisBV; 
+			} // end of samples
+      
+      wordStart = false;
+      oldV = Tv;
+      oldFreq[f] = Tfreq;
+      oldQ[f] = Tq;
+		} // end of phoneme's components
+		bufPos = thisBufPos - blendRate;
+ 		if ( p.plosive ) bufPos += (SAMPLE_FREQUENCY / 15) * speed; // leave a blank for the breath gap
+	} // end of phoneme list
+
+  console.log("Used: "+(bufPos - startBuf) );
+	console.log("min/max buf = " + minBuf + "/" + maxBuf)
+}
+
+// phoneme smoothing function
+function edgef (p) {
+	if (p < 0.1) return 10 * Math.sin(PI * p);
+  if (p > 0.9) return 10 * Math.sin(PI * p);
+	return 1;
+}
+
+function speakClicked() {
+	try {
+		var f0    = parseInt(document.getElementById("f0").value ||"250");
+		var speed = parseFloat(document.getElementById("speed").value ||"0.5");
+		var text  = document.getElementById("text").value;
+		var whisper  = document.getElementById("whisper").checked;
+		var nasal  = document.getElementById("nasal").checked;
+		var blend  = document.getElementById("blend").checked;
+		var smooth  = document.getElementById("smooth").checked;
+		var blendRate = parseFloat(document.getElementById("blendRate").value ||"0");
+		
+		var seconds = Math.ceil((text.length * speed) / 10) * 2;
+		var waveBytes = SAMPLE_FREQUENCY * 2 * 2 * seconds;
+		var buf = new Int16Array(new ArrayBuffer(waveBytes));
+    console.log("Allocated: "+buf.length);
+		SynthSpeech(buf, text, f0, speed, 0, blend, blendRate, whisper, nasal, smooth);
+		playAudioBuffer(buf); 
+	} catch (e) {
+		console.log("Something went horribly wrong:\n" + e);
+	}
+}
+window.speakClicked = speakClicked;
+
+function playAudioBuffer(buf) {
+	var maxAmp = 22000;
+	var audioString = "";
+	for (var i=0; i<buf.length; i++) {
+        var y = (buf[i] / maxAmp) * 0x7800;
+		audioString += String.fromCharCode(y & 255, (y >> 8) & 255);
+	}
+	var audio = new Audio("data:audio/wav;base64,"+btoa(atob("UklGRti/UABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YbS/UAA") + audioString));
+	audio.play();
+}
+
+
+
+// ---------------------------------------------------------------------------
+//
+//    tss.js -- Tiny Speech Synthesizer in JavaScript
+//
+//    Original code: stan_1901 (Andrey Stephanov)
+//    http://pouet.net/prod.php?which=50530
+//
+//    JavaScript port: losso/code red (Alexander Grupe)
+//    http://heckmeck.de/demoscene/tiny-speech-synth-js/
+//
+// ---------------------------------------------------------------------------

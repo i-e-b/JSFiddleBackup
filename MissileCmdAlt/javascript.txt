@@ -1,0 +1,285 @@
+// the basics...
+"use strict";
+var c = document.getElementById('canvas');
+var g = c.getContext('2d');
+g.globalCompositeOperation = "source-over";
+g.font = "14px monospace";
+var framerate = 20;
+var perSecond = 1/framerate;
+
+// Game state
+var redFlash = 0;
+var wordList = getWordList();
+var words = [];
+var bonusRound = false; // don't lose lives on bonus round
+var livesRemain = 10;
+var level = 1;
+var score = 0;
+var firedThisLevel = 0;
+var missiles = [];
+var showTitle = true;
+var target = -1; // which missile are we targeting ( < 0 means none)
+var difficulty = 1; // this should go up as typing gets better. Maybe average life span of missile?
+var maxThisLevel,maxInflight; //missile counts
+
+setLevel();
+
+// ########################################
+// Game main loop:
+// TODO: waves of attack, score, etc.
+// currently just endless attack mode
+var mainInterval = setInterval(function () {
+    if (livesRemain < 1) {
+        gameOver();
+        return;
+    }
+    score = score|0;
+    
+    checkLevel();
+    if (showTitle) {
+        showLevelScreen();
+        return;
+    }
+    
+    drawBackground();
+    g.font = "14px monospace";
+    redFlash = Math.max(0, redFlash - (perSecond*15));
+     
+    addMissilesIfNeeded();
+    for (var i = 0; i < missiles.length; i++) {
+        drawMissile(i);
+        if (impactMissile(i)) i--;
+    }
+
+}, 1000 / framerate); // low frame rate for authentic feel (and battery life)
+
+function gameOver() {
+    clearInterval(mainInterval);
+    
+    g.fillStyle = "#000";
+    g.fillRect(0, 0, c.width, c.height);
+    g.font = "41px monospace";
+    g.fillStyle = "#F90";
+    g.fillText("Game over", 10, c.height / 2);
+    g.font = "17px monospace";
+    g.fillText("Score: "+score, 10, c.height - 20);
+}
+
+function drawBackground() {
+    g.font = "14px sans";
+    g.fillStyle = "#"+((redFlash|0).toString(16))+"00";
+    g.fillRect(0, 0, c.width, c.height - 10);
+    g.fillStyle = "#70A";
+    g.fillRect(0, c.height - 10, c.width, c.height);
+    g.fillStyle = "#AAA";
+    g.fillText("Lives: " + livesRemain + " Score: "+score, 5, 15);
+}
+
+function setLevel(){
+    maxThisLevel = (level * 2) + 10;
+    maxInflight = (level < 6) ? (level + 1) : ((level / 2) + 3);
+    firedThisLevel = 0;
+    difficulty = level / 2;
+    redFlash = 0;
+    bonusRound = false;
+    var wl;
+    if (wl = wordList[level]) {
+        if (wl.words) words = wl.words;
+        if (wl.bonus) bonusRound = true;
+    }
+}
+
+function showLevelScreen() {
+    drawBackground();
+    g.save();
+    g.font = "41px monospace";
+    g.fillStyle = "#F90";
+    g.fillText("Level "+level, 10, c.height / 2);
+    g.font = "17px monospace";
+    
+    g.fillText("press any key to start", 10, c.height - 20);
+    
+    if (level > 1) {
+        g.fillText("rest your hands as long as you want", 10, c.height - 40);
+    }
+    
+    if (wordList[level] && wordList[level].msg) {
+        g.fillText(wordList[level].msg, 10, 40, c.width-20);
+    }
+    
+    g.restore();
+}
+
+function checkLevel(){
+    if (missiles.length > 0 || firedThisLevel < maxThisLevel) return; // current level still going
+    
+    // level up:
+    level++;
+    showTitle = 3;
+    setLevel();
+}
+
+function addMissilesIfNeeded() {
+    if (firedThisLevel >= maxThisLevel) return;
+    if (missiles.length < maxInflight) addMissile();
+}
+
+// make a random missile and fire it
+function addMissile() {
+    if (missiles.length > 0) {
+        var near = c.height;
+        missiles.map(function(z){if (z.y < near) near = z.y;});
+        if (near < 14) return; // too close
+    }
+    var word = findUnusedWord();
+    var x = Math.random() * c.width;
+    var base = Math.max(0, 20 - level);
+    // speed:
+    var dy = Math.max(0.1, ((20 / (word.length)) * (1 + Math.log2(difficulty))) / framerate);
+    var tx = Math.random() * c.width;
+    var dx = (tx - x) / (c.height / dy);
+    missiles.push({
+        ox: x,
+        x: x,
+        y: 0,
+        dx: dx,
+        dy: dy,
+        n: word,
+        dn: ""
+    });
+    firedThisLevel++;
+}
+
+function findUnusedWord() {
+    for (var x = 0; x < 10; x++) {
+        var w = (Math.random() * words.length) | 0;
+        if (indexOfStartChar(words[w][0]) < 0) return words[w];
+    }
+    return words[w];
+}
+
+function drawMissile(n) {
+    g.save();
+    // animate
+    var m = missiles[n];
+    m.x += m.dx;
+    m.y += m.dy;
+    
+    // draw missile path
+    g.strokeStyle = "#AAA";
+    g.beginPath();
+    g.moveTo(m.ox, 0);
+    g.lineTo(m.x, m.y);
+    g.closePath();
+    g.stroke();
+    
+    if (n == target){
+        // draw reticule over dot
+        var scale = 120 / (m.n.length+m.dn.length);
+        var size = m.n.length;
+        g.strokeStyle = "#D00";
+        g.beginPath();
+        g.arc(m.x, m.y, size * scale, 0, Math.PI * 2);
+        g.closePath();
+        g.stroke();
+    }
+    
+    // draw text
+    var tx = centreText(m.n + m.dn, m.x);
+    var dw = g.measureText(m.dn).width;
+    g.fillStyle = "#555";
+    g.fillText(m.dn, tx, m.y + 10);
+
+    g.shadowColor = "#000";
+    g.shadowOffsetX = 0;
+    g.shadowOffsetY = 1;
+    g.shadowBlur = 4;
+    g.strokeStyle = "#000";
+    g.strokeText(m.n, tx+dw, m.y + 10);
+    g.fillStyle = "#F90";
+    g.fillText(m.n, tx + dw, m.y + 10);
+    g.restore();
+}
+
+// returns true if missile hit
+function impactMissile(n) {
+    var m = missiles[n];
+    if (m.y > (c.height - 10)) { // kaboom! Hit the ground!
+        if (target == n) target = -1;
+        missiles.splice(n, 1);
+        difficulty = Math.max(0.5, difficulty - 0.1);
+        if (!bonusRound) {
+            livesRemain--;
+        }
+        return true;
+    }
+    return false;
+}
+
+// Try to centre text without going out of the bound of targetX
+function centreText(txt, targetX) {
+    var p = targetX / c.width;
+    var tw = g.measureText(txt).width;
+    return targetX - (tw * p);
+}
+
+function indexOfStartChar(char) {
+    for (var i = 0; i < missiles.length; i++) {
+        if (missiles[i].n[0] == char) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// knock chars off missle, or pick missile
+function doKeyInput(char) {
+    if (showTitle) {
+        showTitle = false;
+        return;
+    }
+    if (char == " ") return; // ignore space
+    if (target < 0) target = indexOfStartChar(char);
+    if (target < 0 || missiles[target].n[0] != char) {
+        redFlash = 15;
+        score -= level;
+        return; // fail!
+    }
+    var m = missiles[target];
+    m.dn += m.n[0];
+    m.n = m.n.slice(1);
+
+    if (m.n == "") { // win!
+        missiles.splice(target, 1);
+        difficulty += 0.2;
+        target = -1;
+        score += difficulty * level * m.dn.length;
+    }
+}
+
+// Bind to keyboard.
+document.onkeypress = function (e) {
+    e = e || window.event;
+
+    doKeyInput(String.fromCharCode(event.which));
+
+    e.stopPropagation();
+    e.preventDefault();
+    return false;
+};
+
+
+/******************* JUST DATA BELOW HERE ***********************/
+
+// Each level can reset the list so they get harder on later levels
+// Word lists are LZW compressed to avoid flooding the codebase.
+function getWordList() {
+    var unzip = function(s){var D={},c=s[0],o=c,r=c,C=256,p,x,i=0;while(x=s[++i]){x=x.charCodeAt();r+=p=x<256?s[i]:D[x]||o+c;D[C++]=o+(c=p[0]);o=p}return r.split(',')};
+    return {
+        1:{msg:"Type words to shoot down the missiles", words: unzip("a,ableāboutĆovąacĊaddāfterāgainĚĜnsđgĎgoāięallālsħīwaysāmķongāĞanĔĿimīĽswĘĽyāppeaĪrĎŒĀaĶŖkāĊbďřŜsąbšŏĉŋŢĔŢeĞŢfoŒ,ŢěūegĝŰehĝŨeĢŷtėęŢtňŪŰiļbĩŨlŝŰlušoaśodŦooŞothŰoxƞŦrĝƈrĈghśuilŨusŦĉŰŋcīĭƵmąƵĞƵęƽƺŐrƴaƯƺŪƀ,cĘtĠǉhĿĤǎecřcŹƭŒƼitƴƌsĶcĄŐǉloŠǉoƭǨǥƾoƹǨmmĺǰpĄėǨnǌŶcŮŒĐǨuǪǼuǹǂȀrǧǼčƾƦǟǉȆcƲdŐřȓŋdǓiȘ,ȘepȜečǥȟdȚȜiffŉȥǾĊdħȯżȜoļȯnąȶȮƘęȯwĞdrawȜƣčɄȗuƣĻ,ŏǖɌŐlŋŏrƜɏǧŏŽŏĊŪĔŪƧƝȡƅɡęɣɒxamǵąeyąfďɮďĊɯĬ,ɯmƬŋɯęɻĸɯŽɯƜŉȪeĭʄɳeɃfiʅĔʋgɉɮƬʆĝŅʋŀɶĝʒůʋȈɳisƝʋɆfɑɶǩǥʊƘʎƘɳŮʧrǊʰɾĈʘŭɉɶŒɮƣɜʹǮʾǹɶȁĭěǯěɆĤĊŵr˄iˈħĦǪĦƕ,ĦˊČĘĞgŔˊʺ˚ƦȄĔ˛ĈȟˣɃǏĔǏlf,ǏʘǏōƅǏr˩Ŗ˭aɆhą˺Ē˭ɓ˾Ő˩ɚ˾lȟ˺ę̇˻ƇƝŹĸŹĶhǩ˩Ǯ˻Ůǧ̑Ċ̑ʸ̗̚o˧ˡŒĔȚŏ,Ȩ̥ĞĝɎĝƀżĊʠ̥sƌʘǛ,jƯĊkeȞ,kź̼Ƥ̼ȷɃkn̞,̲Ĕ̲ʐaǑƌr͍ŖĊƌǷƌuƨ͇Ĵ͇ŏ͉ɓĞǢɆĄĖ͚ȎǶ͚ſŉlȨąͩƨ͒i̹͇ʚͱŽͩĢƅͩſĄͱ͠ĺļǥƙ͇ƛ΁ͼɃńǖͲńțńŶńͰńĞΏŋńȟńrřńΒąƹĿ,ΛsʑΝƅɸͭΝƬΚ̾ɸnĉΧȎǲȷΒƘΐŮΚŮǹǲŽǲʂęǲȄǺβɆmuɎςsicΝ̷ΝŋnɨąȷǣȷeĔȷȋ,͂ϗexĊζΤͅϗŮɕͅǷϣŹɋϣχϏʵϠɃΪmŢęϮĘŅobjǓĊoˬϺϻĖƅoƝ̒,ǳĺʲĺąĺʦoŎĞʯŮȘęƛ̇ЃʸĈϹϖ̞Ğp͌ąЛŎęЛɔ,ЛȎЛͧrКeЋͺП˰ĶПİКχtΠpʌʲǵɰУƌŶйК̲Н̲Ċйŋpo̫УϡщǧцǟiăНʵĔцňРŒХƦѐĸpƦdσНѝσу˃УƲqƐĢiǳѧχřɁŶɁĞŔɎŔĔѵŋŔĭǾЏ,̡ѽeƹϯŉїĊƣΤɅ҃ƒѶoǔѽƘĸˠʘrȁąғĞsĜĔҘǯҘɃҘŋsǖƘĭҡʌnʲŠĀŠǼʘŠąҮĸŠ˫,ŠǹŪҨĘɆŠĊŠȋŅʡaŎҴ˺ӃiȟʡъӈȁҚ̑Ҟ̣ҴŃɪӐҧү̀φҼiƠφzүĄ̻̱͆sńɵsͅҞħİҜͽҴαӬˡӮɕsŎciҿŎӤǌҭǌęĢŐҼǌǷӽҠėӇtʓҴtʫԈЋԋȆĢʺӿƦɋĢuƖҴσƝΟҗΠΟrɯʲǌѐ,ǺĭǌͰǌlřėďƝėɵėĞėŽƜΜԴĊʂԣ˺ĩԹҀԼԱ̉ԼǧʂŋƜ̀ՅnԪ̏ԹǦąƜɟՋ͖ƩՐҘʘƜʺԹˠ͗Ԇǯԉԣȴeλ՞ǪԉħդԪԌԉĳ˴՞ȾԣɁȢծ̺ծƐծՄɉԱwħˡŉȄ̴ξƬ,uȟƯցǧƯuŅȋŋvчʲ֌ňĭĳ̴ĳԩ,ĳˁժ֖ŐĸĳĶĳtɎ֟ŉĳŋň֖̺řň̋Ċ֐֑Ǉ֧ůňŽwǏ֬˺ʅ֖˺ĞִĘąִχƝֿͺֿǷִħ׆׃h֥ԇw̾׍ɕչŀ֣Ԋչիו֩ŮǪչӋ֖ƣǷɭǣɭĶɭĊyĈ,צȄļשr")},
+        7:{msg:"Bonus round", bonus:true, words:unzip("a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z")},
+        8: {words: unzip("abstract,awaićboolean,brĒkĕyte,casĝğtchĞharĞlĠsĞonĂįntinuĝdebuggeĪĺfaulćĺđĜ,doubđ,elġőķmőxporćexĜndĮŃœĝfĶal,ŧnũlyūloaćfunĆiİ,goto,impđmeĴĮƂŚŜƁıtēceofƍćĶĜrŃƑ,Ųng,ŭĵvĝķlŪpąkaĿ,privŴĝƮžeĆedƭŎlic,ėturĔshśćĂŴƽ,supŀǌwČĥǌyŸhrİizƸ,tǘowǞǠwĮăēsiƇćăĸǞyǏƓ,ƱĪvoiƹǶĬĵŐwhiŐyǪld")},
+        12: {words:unzip("+=,(100),do{,for(;)ċwhile(Ē,@impėmentation,requiī(''ćexpĎts}āzombies!,idx--ń++")},
+        14: {words:unzip("D[C++]=o+(c=p[0]),p=(x<256ĐĀp+cąĂ+,Math.random()")}
+    };
+}

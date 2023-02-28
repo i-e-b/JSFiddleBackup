@@ -1,0 +1,28 @@
+<form>
+<p>
+A very basic speech synth. There limited support for stress and intonation</p>
+<p>
+Sounds: 
+a, e, E, i, y, w, o, u, b, d, f, g, h, k, l, m, n, p, r, s, c, t, v, z, Z/S/T, K
+<br/>
+Tones:
+/ -> tone up, \ -> tone down
+</p><p>
+Space and periods make pauses. Everything else is ignored.
+</p>
+<p>
+<b>Sample reads:</b>This is a speech synthesiser. Type your text and press enter to hear it. It's not very advanced at the moment, but you can understand it with practise.
+</p>
+<textarea id="text" style="width:400px;height:140px">
+Zis iz a sp/i/iK\\ s/in\SEs/a/y\\sr. ta/yp\ yoor t/ekst\\ a/nd pres /e\ntr tu hy/yr\ it.
+its not vEri \adv/ansd aEt TEE m/o\m\E/nt, b\E/t yuu kan \Ehnd/Erstand it wEiT pr/aktycs
+</textarea><br/>
+Base frequency: <input id="f0" value="500" /><br/>
+Speed (lower is faster): <input id="speed" value="0.5"/><br/>
+Whisper: <input type="checkbox" id="whisper"> (turn off base waveform for a whisper like sound)<br/>
+Nasal: <input type="checkbox" id="nasal"> (changes band pass function for a different sound)<br/>
+Blend: <input type="checkbox" id="blend"> (this blends the phoneme parameters across a word)<br/>
+Smooth phonemes: <input type="checkbox" id="smooth" checked="checked"> (smooths the edges of phonemes to reduce pops and clicks)<br/>
+Sample overlap: <input id="blendRate" value="10"/><br/>
+<a href="javascript:speakClicked()">Speak text</a>
+</form>

@@ -1,0 +1,8 @@
+<form>
+Input string:<br/><textarea id="instr" style="width:400px;height:140px">abraca</textarea><br/>
+<a href="javascript:doTransform()">Transform</a>
+</form>
+<b>Encoded:</b>
+<p id="outstr"></p>
+<b>Decoded:</b>
+<p id="finalstr"></p>

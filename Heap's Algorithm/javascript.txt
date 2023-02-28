@@ -1,0 +1,45 @@
+// As the input gets longer, the output grows factorially: (n-1)!
+// Avoid long inputs
+var input = ['A','B','C','D','E'];//,'F','G','H','I'];
+
+document.getElementById('input').innerHTML = JSON.stringify(input);
+
+var rounds = 0;
+permuteAll(input);
+output("Done");
+
+function output(arr) {
+	rounds++;
+	document.getElementById('results').innerHTML += "\r\n"+rounds+" - "+JSON.stringify(arr);
+}
+function even(x){return (x%2)==0;}
+function swap(arr, a, b){
+	var t = arr[a];
+  arr[a]=arr[b];
+  arr[b]=t;
+}
+
+function permuteAll(values) {
+	var c = [];
+  var i = 0;
+  var n = values.length;
+  
+  for (i = 0; i < n; i++){ c.push(0); }
+  
+  output(values);
+  
+  i = 0;
+  while (i < n) {
+  	if (c[i] < i) {
+    	if(even(i)) swap(values, 0, i);
+      else swap(values, c[i], i)
+      
+      output(values); // the calculation takes much less time than the output display.
+      c[i]++;
+      i = 0;
+    } else {
+    	c[i] = 0;
+      i++;
+    }
+  }
+}

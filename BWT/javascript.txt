@@ -1,0 +1,53 @@
+
+// this is the inefficient 'table building' way
+function BWT (str) {
+  var data = str.split('');
+  var len = data.length;
+  var index;
+	var i = 0, endChr = len - 1;
+  var res = [];
+  
+  var table = new Array(len);
+  for (i = 0; i < len; i++) {
+  	data.push(data.shift());
+  	table[i] = data.join('');
+  }
+  table.sort();
+  
+  for (i = 0; i < len; i++) {
+  	if (table[i] == str) index = i;
+  	res.push(table[i][endChr]);
+  }
+  
+  return {index:index, string:res.join('')};
+}
+
+// Restore the table through successive sorting
+// Note: that the sort must be correct for the whole string, not just the most
+//       recently added character
+function iBWT(transformed) {
+  var data = transformed.string;
+  var len = data.length;
+	var res = new Array(len).fill('');
+  
+  for (var i = 0; i < len; i++) {
+  	for (var j = 0; j < len; j++) {
+    	res[j] = data[j] + res[j];
+    }
+    res.sort();
+  }
+ 
+ 	return res[transformed.index];
+}
+
+window.doTransform = function doTransform() {
+	var input = document.getElementById("instr").value;
+  var output = document.getElementById("outstr");
+  var final = document.getElementById("finalstr");
+  
+  var transformed = BWT(input);
+  var restored = iBWT(transformed);
+  
+  output.innerHTML = JSON.stringify(transformed);
+  final.innerHTML = restored
+}

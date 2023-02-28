@@ -1,0 +1,22 @@
+<h3>
+Styled with a border-bottom:
+</h3>
+<div id="border">
+This text is styled (automatically!) by the algorithm below,
+Heterozygotic gas and electricity.
+</div>
+<br/>
+<h3>
+Styled with an inset shadow:
+</h3>
+<div id="shadow">
+This text is styled (automatically?) by the algorithm below;
+Heterozygotic gas and electricity:
+</div>
+<h3>
+Styled with a negative shadow:
+</h3>
+<div id="shadow2">
+This text is styled (automatically?) by the algorithm below;
+Heterozygotic gas and electricity:
+</div>

@@ -1,0 +1,2 @@
+var sp = document.getElementById('scroll');
+setInterval(function(){ sp.scrollTop++; }, 100);

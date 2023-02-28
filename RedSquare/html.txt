@@ -1,0 +1,10 @@
+<canvas id="canvas" height="400" width="400"></canvas>
+<br/><a href="javascript:reset()">Reset Level</a>
+<pre>
+ЯedSquare --
+Click and drag
+    Slide the tiles
+         to put a red tile
+    in the bottom right
+corner of the board
+</pre>

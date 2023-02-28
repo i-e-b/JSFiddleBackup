@@ -1,0 +1,31 @@
+
+// Implementation...
+function underlinify (elementToReplace, underlineClass, descenderClass) {
+	var input = elementToReplace.innerText;
+  var descenders = /([gjpqy.,:;?!()|]+)/g;
+  var words = elementToReplace.innerText.split(' ');
+ 
+  var outp = [];
+ 	for (var i = 0; i < words.length; i++) {
+    var fragments = words[i].split(descenders);
+    if (i>0) outp.push('<span class="'+underlineClass+'"> &nbsp;</span>');
+    
+    outp.push('<span style="white-space:nowrap;">');
+    for (var j = 0; j < fragments.length; j++) {
+      var frag = fragments[j].replace(' ','&nbsp;');
+
+      if (!descenders.test(frag)) frag = '<span class="'+underlineClass+'">'+frag+'</span>';
+      else frag = '<span class="'+descenderClass+'">'+frag+'</span>';
+
+      outp.push(frag);
+    }
+    outp.push('</span>');
+  }
+  
+	elementToReplace.innerHTML = outp.join('');
+}
+
+// Call this to do the underlining:
+underlinify(document.getElementById("border"), "borderUnderlineClass", "");
+underlinify(document.getElementById("shadow"), "insetShadowClass", "");
+underlinify(document.getElementById("shadow2"), "insetShadowClass", "shadow2");

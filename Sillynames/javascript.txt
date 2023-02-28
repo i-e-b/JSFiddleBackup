@@ -1,0 +1,30 @@
+var Vowels = [
+    "a", "e", "i", "o", "u",
+    "a", "e", "i", "o", "u", // multi-count single vowels
+    "a", "e", "i", "o", "u", // as they are so outnumbered by pairs
+    
+    "ai", "au", "aw", "ay", "ea", "ee", "ei", "eu",
+    "ew", "ey", "ie", "oi", "oo", "ou", "ow", "oy",
+    " ", " ", " ", " ", " "
+];
+var Consonants = [
+    "b", "c", "d", "f", "g", "h", "j", "k", "l",
+    "m", "n", "p", "r", "s", "t", "v", "w", "x", "z",
+    
+    "bl", "br", "ch", "ck", "cl", "cr", "dr", "fl", "fr", "gh",
+    "gl", "gr", "ng", "ph", "pl", "pr", "qu", "sc", "sh", "sk",
+    "sl", "sm", "sn", "sp", "st", "sw", "th", "tr", "tw", "wh", "wr", 
+    "nth", "sch", "scr", "shr", "spl", "spr", "squ", "str", "thr",
+    " ", " ", " ", " ", " ", " ", " ", " ", " "
+];
+
+var txt = document.getElementById('t');
+
+for (var row=0; row < 20; row++){
+  txt.innerHTML += "<br/>&nbsp;&nbsp;&nbsp;&nbsp;";
+  var len = (Math.random() * 5) + 3;
+  for (var i=0; i < len; i++) {
+      txt.innerHTML += Consonants[(Math.random() * Consonants.length)|0];
+      txt.innerHTML += Vowels[(Math.random() * Vowels.length)|0];
+  }
+}

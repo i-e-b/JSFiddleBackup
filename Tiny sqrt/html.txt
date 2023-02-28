@@ -1,0 +1,60 @@
+<table>
+<tr>
+<td>Tiny square root</td>
+<td>√(<tt>125</tt>) ≅ </td>
+<td><tt id="res">?</tt></td>
+</tr>
+<tr>
+<td>JS exact result</td>
+<td></td>
+<td><tt id="js">?</tt></td>
+</tr>
+</table>
+
+<br/>
+<br/>
+
+<table>
+
+<tr>
+<td>"Carmack's" inverse root </td>
+<td><tt>√(125)¯¹</tt> ≅ </td>
+<td><tt id="resinv">?</tt></td>
+<td><i>(1 round)</i></td>
+<td>err: <tt id="resinv_4_e">?</tt></td>
+</tr>
+
+<tr>
+<td></td>
+<td></td>
+<td><tt id="resinv_4">?</tt></td>
+<td><i>(4 rounds)</i></td>
+<td>err: <tt id="resinv_4_e">?</tt></td>
+</tr>
+
+<tr>
+<td><a href="https://timmmm.github.io/fast-inverse-square-root/">Tim Hutt's</a> inverse root </td>
+<td></td>
+<td><tt id="resinv2">?</tt></td>
+<td><i>(1 round)</i></td>
+<td>err: <tt id="resinv2_e">?</tt></td>
+</tr>
+
+<tr>
+<td></td>
+<td></td>
+<td><tt id="resinv2_4">?</tt></td>
+<td><i>(4 rounds - note optimisation for 1 round causes drift)</i></td>
+<td>err: <tt id="resinv2_4_e">?</tt></td>
+</tr>
+
+<tr>
+<td>JS exact result</td>
+<td></td>
+<td><tt id="jsinv">?</tt></td>
+</tr>
+
+</table>
+
+<br/>
+<br/>

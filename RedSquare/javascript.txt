@@ -1,0 +1,291 @@
+// Phone/Tablet helpers
+window.addEventListener("touchmove", function(event) {event.stopPropagation(); event.preventDefault();}, false);
+
+// This lie breaks the jsfiddle preview:
+//if (document.documentElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+
+// The usual guff
+var c = document.getElementById('canvas');
+var canvasWidth = c.width;
+var canvasHeight = c.height;
+var ctx = c.getContext('2d');
+// state
+var x,y;    // last mouse position
+var ox, oy; // prev tile
+var dx, dy; // direction of drag + drag lock
+var row=-1,col=-1;// row or col being moved
+var draggingIndex=-1; // the 'color' of the tile we are moving
+var drag = false;
+var win = false; // when true, game over.
+// tile dimensions
+var gsz = 4; // tile count height & width
+var tw = (canvasWidth / gsz);
+var th = (canvasHeight / gsz);
+
+// Internally, '1' is always the red square and '0' is always
+// free space. To move a tile, all entries with equal value should
+// be able to swap with a '0' entry.
+
+var levels = [
+    [ // 0
+        [1, 1, 0, 0],
+        [1, 1, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+    ],
+    [ // 1
+        [1, 1, 1, 0],
+        [1, 2, 1, 0],
+        [2, 2, 1, 0],
+        [0, 0, 0, 0]
+    ],
+    [ // 2
+        [0, 0, 0, 0],
+        [1, 0, 2, 0],
+        [1, 1, 2, 2],
+        [0, 3, 3, 2]
+    ],
+    [ // 3
+        [0, 0, 2, 2],
+        [1, 1, 2, 0],
+        [0, 3, 4, 0],
+        [3, 3, 4, 0]
+    ],
+    [ // 4
+        [1, 0, 2, 0],
+        [1, 0, 3, 0],
+        [4, 5, 3, 3],
+        [0, 5, 5, 0]
+    ],
+    [ // 5
+        [0, 1, 2, 0],
+        [3, 2, 2, 5],
+        [4, 4, 2, 6],
+        [0, 0, 6, 6]
+    ],
+    [ // 6
+        [0, 1, 0, 0],
+        [2, 1, 3, 3],
+        [7, 4, 6, 6],
+        [0, 4, 4, 8]
+    ],
+    [ // 7
+        [0, 1, 1, 2],
+        [3, 3, 9, 2],
+        [8, 5, 5, 7],
+        [8, 0, 4, 7]
+    ],
+    [ // 8
+        [1, 1, 2, 3],
+        [9, 5, 2, 2],
+        [9, 4, 6, 7],
+        [0, 4, 8, 0]
+    ],
+    [ // 9
+        [1, 2, 2, 2],
+        [3, 4, 6, 0],
+        [7, 5, 8, 8],
+        [7, 9, 9,10]
+    ],
+    [ // 10
+        [ 1, 2, 3, 4],
+        [ 5, 6, 7, 8],
+        [ 9, 6, 6, 0],
+        [ 9,10,11,11]
+    ],
+    [ // 11
+        [ 1, 2, 3, 4],
+        [ 5, 6, 7, 8],
+        [10, 6, 6, 9],
+        [10, 0,11,12]
+    ],
+    [ // 12
+        [ 1, 2, 3, 4],
+        [ 5, 6, 7, 8],
+        [ 9, 7, 7,10],
+        [11,12,13, 0]
+    ],
+    [ // 13
+        [ 1, 2, 3, 4],
+        [ 5, 6, 7, 8],
+        [ 9,10,11,12],
+        [13,14,11, 0]
+    ],
+    [ // 14
+        [ 1, 2, 3, 4],
+        [ 5, 6, 7, 8],
+        [ 9,10,11,12],
+        [13,14,15, 0]
+    ],
+    [ // 15
+        [ 0, 0, 0, 1],
+        [ 0, 2, 2, 0],
+        [ 4, 4, 2, 2],
+        [ 5, 5, 2, 3]
+    ]
+];
+
+var currentLevel = 0;
+var current; setLevel(levels[currentLevel]);
+// Every independent block should have its own color. Colors being the same is fine.
+var colors = [
+    "000",
+    "F00", "5F5", "55F",
+    "F0F", "FF0", "0AD",
+    "5DA", "DA5", "AD5",
+    "0AF", "FA0", "A0F",
+    "AA0", "A0A", "0AA"
+]
+
+function setLevel(newLevel) {current = JSON.parse(JSON.stringify(newLevel));}
+function reset(){
+    setLevel(levels[currentLevel]);
+    draw();
+}
+window.reset = reset;
+
+function draw(){
+    // clear to black
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    
+    // Draw the squares, show an edge if neighbour is not same index
+    for(var _y=0; _y < gsz; _y++)
+        for (var _x=0; _x < gsz; _x++) {
+            var us = at(_x,_y);
+            var le = (at(_x-1,_y) == us) ? (0):(1);
+            var te = (at(_x,_y-1) == us) ? (0):(1);
+            var be = (at(_x,_y+1) == us) ? (0):(1);
+            var re = (at(_x+1,_y) == us) ? (0):(1);
+            ctx.fillStyle = '#'+colors[us];
+            ctx.fillRect((_x*tw)+le, (_y*th)+te,(tw-(re+le)),(th-(be+te)));
+        }
+    
+    // Highlight the target square:
+    ctx.font = "bold 20px sans-serif";
+    ctx.fillStyle = "#F00";
+    ctx.fillText((currentLevel+1), canvasWidth - 40, canvasHeight - 30);
+    
+    if (!win) return; // below are level complete messages
+    
+    if (currentLevel + 1 < levels.length) {
+        bigText("Level complete", 40);
+        
+        win = false;
+        detachControls();
+        currentLevel++;
+        setLevel(levels[currentLevel]);
+        
+        setTimeout(function(){
+            attachControls();
+            draw();
+        }, 1000);
+        return;
+    }
+    
+    detachControls();
+    bigText("You win!", 80);
+}
+
+function bigText(str, tsz) {
+    ctx.save();
+    ctx.font = "bold "+tsz+"px sans-serif";
+    ctx.shadowColor = "rgb(0, 0, 0)";
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 5;
+    ctx.shadowBlur = 10;
+    var gradient = ctx.createLinearGradient(0, 30, 0, 100);
+    gradient.addColorStop(0, "rgb(255, 255, 0)");
+    gradient.addColorStop(1, "rgb(255, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillText(str, 25, 100);
+    ctx.restore();
+}
+
+function at (ix,iy){
+    if (current[iy] == undefined) return -1;
+    if (current[iy][ix] == undefined) return -1;
+    return current[iy][ix];
+};
+function set (ix,iy, v){
+    current[iy][ix] = v;
+};
+function mtot(x,y) {return {x:((x / tw)|0), y:((y / th)|0)};}
+                             
+// The game...
+function startMove(e){
+    // register start of motion
+    drag = true;
+    var p = mtot(e.pageX - 10, e.pageY - 10);
+    ox = p.x; oy = p.y;
+    row = oy; col = ox;
+    draggingIndex = current[row][col];
+    draw();
+}
+function endMove(e){drag=false;dx=dy=0;row=col=-1;}
+function slideMove(e){
+    // moving
+    if (!drag) return;
+    var p = mtot(e.pageX - 10, e.pageY - 10);
+    if (p.x == ox && p.y == oy) return; // not moved out
+    dx = p.x - ox; dy = p.y - oy;
+    ox = p.x; oy = p.y;
+    
+    if (canSlide(draggingIndex, dx, dy)) slide(draggingIndex, dx, dy);
+    
+    // check if solution
+    if (current[gsz-1][gsz-1] == 1) {
+        win = true;
+    }
+    draw();
+}
+
+function detachControls() {
+    c.onmousedown = undefined;
+    c.ondblclick = undefined;
+    showTarget = drag = false;
+}
+
+function attachControls() {
+    c.ondblclick = startMove;
+    c.onmousedown = startMove;
+    c.onmouseup = endMove;
+    c.onmouseout = endMove;
+    c.onmousemove = slideMove;
+}
+
+function canSlide(idx, ddx, ddy) {
+    for(var _y=0; _y < gsz; _y++)
+        for (var _x=0; _x < gsz; _x++) {
+            var us = at(_x,_y);
+            if (us !== idx) continue;
+            var targ = at(_x + ddx, _y + ddy);
+            if ((targ === -1) || (targ !== 0 && us != targ)) {
+                return false;
+            }
+        }
+    return true;
+}
+
+function slide(idx, ddx, ddy) {
+    var sy = ddy > 0 ? gsz : 0;
+    var ey = ddy > 0 ? -1 : gsz;
+    var dy = ddy > 0 ? -1 : 1;
+    var sx = ddx > 0 ? gsz : 0;
+    var ex = ddx > 0 ? -1 : gsz;
+    var dx = ddx > 0 ? -1 : 1;
+    
+    for(var _y=sy; _y != ey; _y+=dy)
+        for(var _x=sx; _x != ex; _x+=dx) {
+            var us = at(_x,_y);
+            if (us !== idx) continue;
+            var targ = at(_x + ddx, _y + ddy);
+            set(_x,_y,targ);
+            set(_x+ddx, _y+ddy, us);
+        }
+}
+
+// OK, GO!
+draw();
+attachControls();

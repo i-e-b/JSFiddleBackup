@@ -1,0 +1,31 @@
+var inp = document.getElementById('target');
+
+var findDisallowedEmailChars = /[^A-Za-z0-9@._]/g; // just a sample -- don't really use this!
+var maxLength = 30; // and REALLY don't use this!
+var emptyStr = '';
+
+inp.addEventListener('input', function(evt) {
+  // The HTML5 spec only allows selection on inputs type="text|search|password|tel|url"
+  // Chrome is the only browser that enforces this, but we work around by setting
+  // all inputs to text type momentarily if we need to correct the input.
+  // we need to do the position read and set in a timeout, otherwise the DOM won't be
+  // up-to-date and we get 0 as the position.
+
+  var clean = inp.value.replace(findDisallowedEmailChars, emptyStr).substr(0, maxLength);
+
+  if (clean !== inp.value) {
+  	var removeCount = (inp.value.match(findDisallowedEmailChars) || []).length;
+    var prevType = inp.type;
+    inp.type = "text";
+    setTimeout(function() {
+      var start = inp.selectionStart - removeCount;
+      var end = inp.selectionEnd - removeCount;
+
+      inp.value = clean;
+
+      this.setSelectionRange(start, end);
+      inp.type = prevType;
+    }.bind(this), 0);
+  }
+
+});
