@@ -1,0 +1,9 @@
+body {
+    overflow:hidden;
+    width:100%;
+}
+html {
+-ms-touch-action: manipulation;
+touch-action: manipulation;
+}
+</style> <!-- access to the HEAD element --> <meta content='width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;' name='viewport' /> <meta name="viewport" content="width=device-width" /> <meta name="apple-mobile-web-app-capable" content="yes" /> <meta name="mobile-web-app-capable" content="yes" /> <style>

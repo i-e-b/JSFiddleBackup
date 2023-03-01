@@ -1,0 +1,3 @@
+<p id='size'></p>
+<p>Data from canvas</p>
+<p style="font-family:monospace;line-height: 1;" id="data"></p>

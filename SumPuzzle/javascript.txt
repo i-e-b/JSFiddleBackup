@@ -1,0 +1,459 @@
+// the basics...
+var c = document.getElementById('canvas');
+var W = c.width, canvasWidth = c.width;
+var H = c.height; canvasHeight = c.height;
+var canvCX = c.width / 2;
+var canvCY = c.height / 2;
+var ctx = c.getContext('2d');
+ctx.globalCompositeOperation = "source-over";
+document.onselectstart = function () { return false; }; // ie
+document.onmousedown = function () { return false; }; // others
+
+// shim layer with setTimeout fallback
+
+var particles = [];
+window.requestAnimFrame = (function () {
+    return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || function (callback) {
+        window.setTimeout(callback, 1000 / 25);
+    };
+})();
+
+function saveLevel (level) {
+    document.cookie = "SumPuzzle=" + level +  "; path=/";
+}
+
+function getLevel() {
+    // TEMP:
+    //return 3;
+    // END TEMP
+    if (document.cookie.length > 0) {
+        c_start = document.cookie.indexOf("SumPuzzle=");
+        if (c_start != -1) {
+            c_start = c_start + 10;
+            c_end = document.cookie.indexOf(";", c_start);
+            if (c_end == -1) {
+                c_end = document.cookie.length;
+            }
+            var l = unescape(document.cookie.substring(c_start, c_end));
+            console.log("Loading "+l);
+            return +l;
+        }
+    }
+    return 0;
+}
+
+var active = true, designMode = false;
+var current;
+var level = getLevel();
+
+var ADD=1,SUB=2,DIV=3,MUL=4;
+var operators = [
+    {c:"?", f:function(a,b){return NaN;}},
+    {c:"+", f:function(a,b){return a+b;}},
+    {c:"−", f:function(a,b){return a-b;}},
+    {c:"÷", f:function(a,b){return a/b;}},
+    {c:"×", f:function(a,b){return a*b;}}
+];
+
+var levels = [
+// level format: series of connection defs. either {l:_, o:_, r:_} where left and right given (both node),
+//               or {s:_, o:_, r:_} where right is given and left comes from the result of another connection (`s` is index into level)
+//               or {s:_, o:_, s2:_} for two sources and a fixed operator.
+//               or {s:_, t:_} for target. `s` is index into level, `t` is node
+// node format: {x:_, y:_, n:_}, node centre x,y and number value; {x:_,y:_,op:_}, node centre and operator index (for double source, later)
+// Levels must be constructed in evaluation order, and will have a result field added/updated when evaluating
+// Levels must start with a {l,o,r}
+// 0 Single operation
+[{l:{x:1,y:1,n:5},o:0,r:{x:2,y:1,n:5}}, {s:0,t:{x:3,y:1,n:1}}],
+// 1 two-item chain
+[{l:{x:1,y:1,n:5},o:0,r:{x:2,y:1,n:5}},  {s:0,o:0,r:{x:2,y:2,n:1}},  {s:1,t:{x:3,y:2,n:9}}],
+// 2 negatives
+[{l:{x:1,y:1,n:-1},o:0,r:{x:1,y:2,n:1}}, {s:0,o:0,r:{x:2,y:2,n:2}},  {s:1,o:0,r:{x:2,y:1,n:3}}, {s:2,t:{x:3,y:1,n:3}} ],
+// 3 More negatives
+[{l:{x:3,y:3,n:8},o:0,r:{x:2,y:3,n:-4}}, {s:0,o:0,r:{x:1,y:3,n:11}}, {s:1,o:0,r:{x:1,y:2,n:-1}}, {s:2,t:{x:1,y:1,n:7}}],
+// 4 single fixed sum
+[{l:{x:1,y:1,n:5},o:0,r:{x:2,y:1,n:5}},  {l:{x:1,y:2,n:2},o:0,r:{x:2,y:2,n:5}}, {s:0,s2:1,o:MUL},  {s:2, t:{x:3,y:1.5,n:100}}],
+// 5 floating middle sum
+[{l:{x:1,y:1,n:1},o:0,r:{x:1,y:2,n:2}}, {l:{x:3,y:1,n:5},o:0,r:{x:3,y:2,n:10}}, {s:0,s2:1,o:DIV}, {s:2, t:{x:2,y:3,n:1}}],
+// 6 divides upside-down
+[{l:{x:1,y:2,n:3},o:0,r:{x:1,y:1,n:3}}, {l:{x:3,y:2,n:12},o:0,r:{x:3,y:1,n:6}}, {s:0,s2:1,o:ADD}, {s:2, t:{x:2,y:2,n:3}}],
+// 7 two dependencies (starting to get hard, not clear what direction things are gathered)
+[{l:{x:0,y:0,n:8},o:0,r:{x:2,y:0,n:4}}, {s:0,o:0,r:{x:4,y:0,n:2}},  
+{l:{x:0,y:3,n:3},o:0,r:{x:2,y:3,n:6}}, {s:2,o:0,r:{x:4,y:3,n:9}},
+{s:0,s2:2,o:SUB}, {s:1,s2:3,o:SUB}, {s:4,s2:5,o:ADD}, {s:6,t:{x:3,y:2.25,n:1}}],
+// 8 galaxy spiral
+[{l:{x:1,y:0,n:50},o:0,r:{x:2,y:0,n:25}}, {s:0,o:0,r:{x:3,y:1,n:15}},
+ {l:{x:4,y:2,n:1},o:0,r:{x:3,y:3,n:2}}, {s:2,o:0,r:{x:2,y:3,n:3}}, {s:3,o:0,r:{x:1,y:2,n:4}},
+ {s:1,s2:4,o:DIV}, {s:5,t:{x:2.5,y:2,n:8}}],
+
+// HARDER LEVELS!!
+// spiral (long one!  / - / + + * * + / )
+[{l:{x:0,y:1,n:1000},o:0,r:{x:1,y:0,n:10}}, {s:0,o:0,r:{x:2,y:0,n:10}}, {s:1,o:0,r:{x:3,y:0,n:10}}, {s:2,o:0,r:{x:4,y:1,n:10}},
+{s:3,o:0,r:{x:4,y:2,n:10}}, {s:4,o:0,r:{x:3,y:3,n:10}}, {s:5,o:0,r:{x:2,y:3,n:10}}, {s:6,o:0,r:{x:1,y:2,n:10}},
+{s:7,o:0,r:{x:2,y:1,n:10}}, {s:8,t:{x:2.75,y:1.75,n:291}}],
+// multiple fixed sum (  * * / - *  )
+[{l:{x:0,y:0,n:4},o:0,r:{x:1,y:0,n:7}},  {l:{x:0,y:1,n:2},o:0,r:{x:1,y:1,n:8}}, {s:0,s2:1,o:DIV}, 
+{l:{x:4,y:0,n:-1},o:0,r:{x:3,y:0,n:-1}},  {l:{x:4,y:1,n:6},o:0,r:{x:3,y:1,n:5}}, {s:3, s2:4,o:DIV},   {s:2, s2:5,o:MUL},
+{s:6, o:0, r:{x:2,y:2,n:3}}, {s:7, t:{x:2, y:3, n:336}}]
+];
+
+// start the game:
+if (level >= levels.length) { // already completed. Restart.
+    level = 0;
+}
+advanceLevel();
+//gameOver();
+
+c.ondblclick = function(e){e.stopPropagation();e.preventDefault();};
+c.onclick = function (e) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!active) return;
+    var x = e.pageX - c.offsetLeft;
+    var y = e.pageY - c.offsetTop;
+
+    // Loop through links, skip those without ops.
+    // if op, calc pos. check if within 20 of pos. Cycle op.
+    // recalculate game results and draw game
+    for (var i = 0; i < current.length; i++) {
+        var lnk = current[i];
+        if (!HasOp(lnk) || IsFixedOp(lnk)) continue;
+        var A = GetA(lnk);
+        var B = GetB(lnk);
+        var mx = ix((A.x+B.x)/2);
+        var my = ix((A.y+B.y)/2);
+        var dx = Math.abs(mx - x);
+        var dy = Math.abs(my - y);
+        if (dx < 20 && dy < 20) { // this one
+            lnk.o = (lnk.o + 1) % operators.length; // cycle includes '?' for now. Maybe keep?
+            break;
+        }
+    }
+    var isWin = calculateGame();
+    drawGame();
+
+    if (isWin) {
+        level++;
+        saveLevel(level);
+        advanceLevel();
+    }
+};
+
+// go through the links updating results
+function calculateGame() {
+    var isWin = false;
+    for (var i = 0; i < current.length; i++) {
+        var lnk = current[i];
+        var A = GetA(lnk);
+        var B = GetB(lnk);
+        
+        var a = (OwnA(lnk)) ? (A.n) : (current[lnk.s].result);
+        var b = (OwnB(lnk)) ? (B.n) : (current[lnk.s2].result);
+
+        if (!HasOp(lnk)) {lnk.result = a;} // hack
+        else {lnk.result = operators[lnk.o].f(a,b);}
+
+        if (IsTarg(lnk)) {
+            // uncomment to help build levels:
+            console.log("r="+lnk.result);
+            // ;
+            isWin = lnk.result == B.n;
+        }
+    }
+    return isWin;
+}
+
+// draw the current game layout.
+function drawGame() {
+    // background
+    var gradient = ctx.createRadialGradient(canvCX, canvCY, 0, canvCX, canvCY, canvasWidth);
+    gradient.addColorStop(0.2, "rgb(255, 255, 255)");
+    gradient.addColorStop(1, "rgb(192,192,192)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0,0,canvasWidth, canvasHeight);
+
+    // Lines
+    for (var i = 0; i < current.length; i++) {
+        var lnk = current[i];
+        var A = GetA(lnk);
+        var B = GetB(lnk);
+        if (IsFixedOp(lnk)) { // add a fake node to help drawing
+            var mx = (A.x+B.x)/2;
+            var my = (A.y+B.y)/2;
+            lnk.r = {x:mx, y:my};
+        }
+        feint(A, B);
+    }
+
+    // Nodes and operators
+    for (var i = 0; i < current.length; i++) {
+        var lnk = current[i];
+        var A = GetA(lnk);
+        var B = GetB(lnk);
+        if (OwnA(lnk)) {
+            drawNode(ix(A.x), ix(A.y), A.n);
+        }
+        if (OwnB(lnk)) {
+            if (IsTarg(lnk)) {
+                var isWin = lnk.result == B.n;
+                drawGoalNode(ix(B.x), ix(B.y), B.n, isWin);
+            } else {
+                drawNode(ix(B.x), ix(B.y), B.n);
+            }
+        }
+        if (HasOp(lnk)) {
+            var mx = ix((A.x+B.x)/2);
+            var my = ix((A.y+B.y)/2);
+            if (IsFixedOp(lnk)) {
+                drawFixedOpNode(mx, my, operators[lnk.o].c);
+            } else {
+                drawOperator(mx,my, operators[lnk.o].c);
+            }
+        }
+    }
+}
+function HasOp(lnk) { return lnk.o != undefined; }
+function OwnA(lnk) { return lnk.s == undefined; }
+function OwnB(lnk) { return lnk.s2 == undefined; }
+function IsFixedOp(lnk) { return (lnk.s != undefined) && (lnk.s2 != undefined); }
+function IsTarg(lnk) { return lnk.t != undefined; }
+function GetA(lnk) { return (lnk.s != undefined)?(current[lnk.s].r):(lnk.l); }
+function GetB(lnk) { return (lnk.s2 != undefined)?(current[lnk.s2].r): ((lnk.t!=undefined)?(lnk.t):(lnk.r)); }
+function feint(nA, nB) { // draw a light line between two nodes, with a hint of direction
+    if (!nA || !nB) return;
+
+    var ax = ix(nA.x),
+        ay = ix(nA.y),
+        bx = ix(nB.x),
+        by = ix(nB.y),
+        mx = ( (ax - bx) / 2 ) + bx,
+        my = ( (ay - by) / 2 ) + by;
+
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ax,ay);
+    ctx.lineTo(mx,my);
+    ctx.strokeStyle = '#d80';
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(mx,my);
+    ctx.lineTo(bx,by);
+    ctx.strokeStyle = '#77f';
+    ctx.stroke();
+}
+function ix(idx) { // grid coords to canvas coords.
+    return (idx * 120) + 40; // tight layout
+    // return (idx * 160) + 40; // loose layout
+}
+
+// draw the goal node, with true or false for success
+function drawGoalNode(px,py, num, met) {
+    drawAnyNode(px,py, 35, num, 8, (met)?('#0F0'):('#F00'));
+}
+
+// draw a number node centred on px,py
+function drawNode(px,py, num) {
+    drawAnyNode(px,py, 30, num, 4, '#77f');
+}
+
+// draw a fixed-operator centred on px,py
+function drawFixedOpNode(px,py, str) {
+    drawAnyNode(px,py, 20, str, 2, '#888');
+}
+
+function drawAnyNode(px, py, sz, str, width, color) {
+    ctx.save();
+
+    ctx.beginPath();
+    ctx.lineWidth = width;
+    ctx.strokeStyle = color;
+    ctx.arc(px, py, sz, Math.PI * 2, false);
+    ctx.fillStyle='#fff';
+    ctx.fill();
+    ctx.stroke();
+
+    
+    var f = 31; hw = 100; 
+    while (hw > (sz-5)) {
+        f--; ctx.font = f+"px monospace";
+        hw = ctx.measureText(str).width / 2;
+    }
+    var hh = f / 3;
+
+    ctx.fillStyle = '#000';
+    ctx.fillText(str, px - hw, py + hh);
+
+    ctx.restore();
+}
+
+// draw a user-changable operator centred on px, py
+function drawOperator(px, py, char) {
+    ctx.save();
+    
+    ctx.shadowColor = "rgb(0, 0, 0)";
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 3;
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    ctx.fillStyle = '#77f';
+    ctx.arc(px, py, 20, Math.PI * 2, false);
+    ctx.fill();
+
+    ctx.font = "30px monospace";
+    ctx.fillStyle = '#fff';
+    ctx.fillText(char, px - 9, py + 10);
+
+    ctx.restore();
+}
+
+function drawLevelUp() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.font = "bold 60px sans-serif";
+    var fg = ctx.createLinearGradient(0, 100, 0, 110);
+    fg.addColorStop(0, "rgb(0, 255, 255)");
+    fg.addColorStop(1, "rgb(0, 192, 255)");
+    ctx.shadowColor = "rgb(0, 0, 0)";
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = fg;
+    var msg = "Level "+(level+1);
+    var w = ctx.measureText(msg).width / 2;
+    ctx.fillText(msg, canvCX - w, canvCY - 35);
+    ctx.restore();
+}
+
+function advanceLevel() {
+    active = false;
+    
+    var lev = levels[level];
+    
+    if (!lev) {
+        setTimeout(function(){
+            gameOver();
+        }, 1000);
+        return;
+    }
+    
+    current = lev;
+    
+    if (level > 0) { // level-up. Show some glitter.
+        setTimeout(function(){
+            drawLevelUp();
+            setTimeout(function(){active = true; drawGame();}, 1000);
+        }, 1500);
+    } else { // first level. Just go!
+        active = true; drawGame();
+    }
+}
+
+
+function particle()
+	{
+		//speed, life, location, life, colors
+		//speed.x range = -2.5 to 2.5 
+		//speed.y range = -15 to -5 to make it move upwards
+		//lets change the Y speed to make it look like a flame
+		this.speed = {x: -2.5+Math.random()*5, y: -15+Math.random()*10};
+		//location = mouse coordinates
+		//Now the flame follows the mouse coordinates
+        var rx = Math.random()*canvasWidth - canvCX;
+		this.location = {x: canvCX + rx, y: canvasHeight - 20};
+		//radius range = 10-30
+		this.radius = 10+Math.random()*20;
+		//life range = 20-30
+		this.life = 20+Math.random()*10;
+		this.remaining_life = this.life;
+		//colors
+		this.r = Math.round(Math.random()*255);
+		this.g = Math.round(Math.random()*255);
+		this.b = Math.round(Math.random()*255);
+	}
+function drawFireworks()
+	{
+		//Painting the canvas black
+		//Time for lighting magic
+		//particles are painted with "lighter"
+		//In the next frame the background is painted normally without blending to the 
+		//previous frame
+		ctx.globalCompositeOperation = "source-over";
+		ctx.fillStyle = "black";
+		ctx.fillRect(0, 0, W, H);
+		ctx.globalCompositeOperation = "lighter";
+		
+		for(var i = 0; i < particles.length; i++)
+		{
+			var p = particles[i];
+			ctx.beginPath();
+			//changing opacity according to the life.
+			//opacity goes to 0 at the end of life of a particle
+			p.opacity = Math.round(p.remaining_life/p.life*100)/100
+			//a gradient instead of white fill
+			var gradient = ctx.createRadialGradient(p.location.x, p.location.y, 0, p.location.x, p.location.y, p.radius);
+			gradient.addColorStop(0, "rgba("+p.r+", "+p.g+", "+p.b+", "+p.opacity+")");
+			gradient.addColorStop(0.5, "rgba("+p.r+", "+p.g+", "+p.b+", "+p.opacity+")");
+			gradient.addColorStop(1, "rgba("+p.r+", "+p.g+", "+p.b+", 0)");
+			ctx.fillStyle = gradient;
+			ctx.arc(p.location.x, p.location.y, p.radius, Math.PI*2, false);
+			ctx.fill();
+			
+			//lets move the particles
+			p.remaining_life--;
+			p.radius--;
+			p.location.x += p.speed.x;
+			p.location.y += p.speed.y;
+			
+			//regenerate particles
+			if(p.remaining_life < 0 || p.radius < 0)
+			{
+				//a brand new particle replacing the dead one
+				particles[i] = new particle();
+			}
+		}
+	}
+
+function gameOver() {
+    active = false;
+	for(var i = 0; i < 100; i++)
+	{
+		particles.push(new particle());
+	}
+    gameOverAnim();
+}
+
+function gameOverAnim(t) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    // draw some FIREWORKS!
+    ctx.save();
+    drawFireworks();
+    ctx.restore();
+    
+    // draw text over the top
+    ctx.save();
+    ctx.font = "bold 60px sans-serif";
+    var fg = ctx.createLinearGradient(0, 100, 0, 320);
+    fg.addColorStop(0, "rgb(0, 255, 255)");
+    fg.addColorStop(1, "rgb(0, 192, 255)");
+    ctx.shadowColor = "rgb(64, 128, 192)";
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 5;
+    ctx.shadowBlur = 5;
+    ctx.fillStyle = fg;
+    var centreText = function(msg, msgY) {
+        var w = ctx.measureText(msg).width / 2;
+        ctx.fillText(msg, canvCX - w, msgY);
+    }
+    centreText("Game Over", 120);
+    centreText("You are the", 260);
+    centreText("CHAMPION!", 350);
+    ctx.restore();
+    window.requestAnimFrame(gameOverAnim);
+}
+
+
+
+

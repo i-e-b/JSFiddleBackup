@@ -1,0 +1,2 @@
+<canvas id="canvas" height="400" width="400"></canvas>
+<br/>To save levels, make sure you are not blocking cookies from "fiddle.jshell.net"

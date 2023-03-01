@@ -1,0 +1,58 @@
+// the basics...
+var c = document.getElementById('canvas');
+var ctx = c.getContext('2d');
+ctx.globalCompositeOperation = "source-over";
+
+// draw on screen (for a base)
+ctx.fillStyle = "#000";
+ctx.fillRect(0, 0, 400, 400);
+
+// Offscreen:
+var offscreenCanvas = document.createElement('canvas');
+offscreenCanvas.width = 1000;
+offscreenCanvas.height = 20;
+var osc = offscreenCanvas.getContext('2d');
+
+// draw something offscreen
+osc.globalCompositeOperation = "lighter";
+osc.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height); //get a clear alpha
+osc.fillStyle = "#842";
+var fr,i;
+for (fr = 1; fr < 10; fr++) {
+    var offx = 10 + (fr*20);
+    for (i = 0; i < fr; i++) {
+        fillCirc(osc, offx + i, 10, 5);
+    }
+}
+
+
+
+//copy from offscreen to main.
+var k, j = 0;
+setInterval(function () {
+    j = (j + 1) % 10;
+    k = 5 + (j*20);
+    ctx.fillRect(0, 0, 400, 400);
+        ctx.drawImage(offscreenCanvas,
+        //src:
+        k, 4, 20, 12,
+        //dst:
+        14, 14, 20, 12);
+}, 1000 / 60);
+
+function fillCirc(context, x,y,radius) {
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.closePath();
+    context.fill();
+}
+document.onkeypress = function (e) {
+    e = e || window.event;
+
+    // get string of character
+    console.log(String.fromCharCode(event.which));
+
+    e.stopPropagation();
+    e.preventDefault();
+    return false;
+};

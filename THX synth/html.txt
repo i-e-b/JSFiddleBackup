@@ -1,0 +1,1 @@
+<a href="javascript:go()"> Play the sound </a>

@@ -1,0 +1,179 @@
+// From http://js1k.com/2012-love/demo/1276
+var c = document.getElementById('canvas');
+var n = c.width = c.height = 240;
+var canvasWidth = c.width;
+var canvasHeight = c.height;
+var a = c.getContext('2d');
+
+var b = {};
+
+var F = 'fillStyle';
+var W = 0,
+    S = 0,
+    L = 0,
+    P = 0;
+var g = 60;
+var G = 30; // G = g/2
+var q = ' / ';
+
+/* Level 1 */
+var l = '0000' +
+    '0440' +
+    '0120' +
+    '0000' +
+
+/* Level 2 */
+    '4122' +
+    '2222' +
+    '2142' +
+    '2222' +
+
+/* Level 3*/
+    '1141' +
+    '2424' +
+    '1141' +
+    '1121' +
+
+/* Level 4*/
+    '1142' +
+    '1121' +
+    '2244' +
+    '1212' +
+
+/* Level 5*/
+    '0240' +
+    '4004' +
+    '2002' +
+    '2242' +
+
+/* Level 6*/
+    '2220' +
+    '2212' +
+    '2124' +
+    '0240';
+
+a.font = '13px arial';
+
+// get raw access to image data
+var imageData = a.getImageData(0, 0, n, n);
+var buf = new ArrayBuffer(imageData.data.length);
+var buf8 = new Uint8ClampedArray(buf);
+var data = new Uint32Array(buf);
+// black background for interleaved display
+var sqn = n * n;
+for (var qan = 0; qan < sqn; ++qan) {
+    data[qan] = 255 << 24;
+}
+
+c.onclick = function (e) {
+    x = e.pageX;
+    y = e.pageY;
+    x -= x % g - G;
+    y -= y % g - G;
+    z = b[x + q + y];
+    z && (z.P *= 2, P++, W++) //inc power
+}
+
+function R(f) { //bugfix: f must be defined
+
+    //load new level
+    if (S > 1 && S < 2) {
+
+        for (i = 0; i < 16; i++) {
+
+            w = parseInt(l[i + L * 16]);
+            x = i % 4 * g + G;
+            y = ((i / 4) | 0) * g + G;
+            w && (b[x + q + y] = {
+                x: x,
+                y: y,
+                p: 0,
+                P: w
+            });
+        }
+
+        S++
+    }
+
+    k = 0;
+    var v = [];
+
+    for (o in b) { //update blobs
+
+        v[k] = j = b[o];
+        p = j.p += (j.P - j.p) / 3; //tween power
+        I = j.i;
+        x = j.x += [, 4, , -4][I] || 0; // move if i set: i = direction
+        y = j.y += [4, , -4, ][I] || 0;
+
+        if (p > 4) {
+            for (i = 4; i--;) { //split if p > 4
+                b[o + i] = {
+                    x: x,
+                    y: y,
+                    p: 1,
+                    P: 1,
+                    i: i
+                };
+            }
+            b[o] = 0;
+        }
+
+
+        if (x < -G || y < -G || x > n + G || y > n + G || !j || (I + 1 && (f = b[x + q + y]))) {
+            delete b[o];
+            if (f)(f.P += f.P);
+            //remove off screen, collision, deleted blobs
+        }
+
+        k++; // count onscreen blobs
+
+    }
+
+    a.globalCompositeOperation = "source-over";
+    a.fillStyle = "black";
+    a.fillRect(0, 0, canvasWidth, canvasHeight);
+    a.globalCompositeOperation = "lighter";
+
+    //state changes:
+    P > 3 && (S = P = 0, b = []); //to many turns
+    S - 2 || k || (S = P = 0, L++); // completed level
+
+
+    var cr = (L > 1 ? 255 : 0);
+    var cg = (L < 4 ? 255 : 0);
+    for (var V = k; V >= 0; V--) { //for each blob
+        var xo = v[V];
+        if (!xo) continue;
+        X = xo.x;
+        Y = xo.y;
+        var pv = xo.p * 8;
+        var gs = xo.p / 6;
+        gs = (gs>1)?1:gs;
+
+        a.beginPath();
+        var gradient = a.createRadialGradient(X, Y, 0, X, Y, pv);
+        gradient.addColorStop(gs, "rgba(" + cr + ", " + cg + ", 0,255)");
+        gradient.addColorStop(1, "rgba(" + cr + ", " + cg + ", 0, 0)");
+        a.fillStyle = gradient;
+        a.arc(X, Y, pv, Math.PI * 2, false);
+        a.fill();
+    }
+
+    // write status
+    a[F] = '#fff';
+    S > 1 ? a.fillText(P + q + 3, 5, 16) : a.fillText(L < 6 ? (S += .04, L > 4 ? 'final level' : 'level ' + (L + 1)) : W + ' clicks', 105, 125);
+
+};
+
+// shim layer with setTimeout fallback
+window.requestAnimFrame = (function () {
+    return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || function (callback) {
+        window.setTimeout(callback, 1000 / 60);
+    };
+})();
+
+(function animloop(t) {
+    window.requestAnimFrame(animloop);
+    R(); // TODO: if nothing moving, don't animate until click.
+})();

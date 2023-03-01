@@ -1,0 +1,25 @@
+var c = document.createElement( 'canvas' );  
+//document.body.appendChild(c);
+c.width = 30;
+c.height = 12;
+var a = c.getContext( '2d' );
+
+a.fillStyle = "#000";
+a.fillRect(0, 0, c.width, c.height);
+
+a.fillStyle = "#fff";
+a.font = '12px arial';
+a.fillText('Test', 1, 10);
+
+var lineWidth = c.width * 4;
+
+var data = a.getImageData(0, 0, c.width, c.height).data;
+var thresh = [];
+for(var i=0;i<data.length;i+=4) {
+    if ((i%lineWidth) === 0) thresh.push("\r\n");
+    thresh.push((data[i] > 127) ? ('▓ ') : ('░ '));
+}
+
+document.getElementById('data').innerText = thresh.join('');
+
+document.getElementById('size').innerText = (data.length) / (30 * 10) + " samples per pixel";

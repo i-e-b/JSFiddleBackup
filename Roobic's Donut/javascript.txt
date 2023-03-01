@@ -1,0 +1,139 @@
+// Phone/Tablet helpers
+window.addEventListener("touchmove", function(event) {event.stopPropagation(); event.preventDefault();}, false);
+//if (document.documentElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+
+// The usual guff
+var c = document.getElementById('canvas');
+var canvasWidth = c.width;
+var canvasHeight = c.height;
+var ctx = c.getContext('2d');
+// state
+var x,y;    // last mouse position
+var ox, oy; // prev tile
+var dx, dy; // direction of drag + drag lock
+var row=-1,col=-1;// row or col being moved
+var showTarget = false;
+var drag = false;
+var win = false; // when true, game over.
+// tile dimensions
+var tw = (canvasWidth / 8);
+var th = (canvasHeight / 8);
+
+// the solution. When current equals this, you win.
+var target = [
+    [1, 2, 3, 4, 5, 6, 7, 0],
+    [1, 2, 3, 4, 5, 6, 7, 0],
+    [1, 2, 3, 4, 5, 6, 7, 0],
+    [1, 2, 3, 4, 5, 6, 7, 0],
+    [1, 2, 3, 4, 5, 6, 7, 0],
+    [1, 2, 3, 4, 5, 6, 7, 0],
+    [1, 2, 3, 4, 5, 6, 7, 0],
+    [1, 2, 3, 4, 5, 6, 7, 0]
+];
+var current = [
+		[0, 1, 2, 3, 5, 6, 7, 0],
+    [1, 2, 3, 4, 4, 5, 6, 7],
+    [0, 1, 2, 3, 5, 6, 7, 0],
+    [1, 2, 3, 4, 4, 5, 6, 7],
+    [0, 1, 2, 3, 5, 6, 7, 0],
+    [1, 2, 3, 4, 4, 5, 6, 7],
+    [0, 1, 2, 3, 5, 6, 7, 0],
+    [1, 2, 3, 4, 4, 5, 6, 7]
+];
+var colors = [
+    "F00", "0F0", "00F",
+    "F0F", "FF0", "0FF",
+    "FFF", "ABC", "000"
+]
+
+function draw(){
+    // clear to black
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = (showTarget) ? ("#fff") : ("#000");
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    
+    var which = (showTarget) ? (target) : (current);
+    
+    for(var _y=0; _y < 8; _y++)
+        for (var _x=0; _x < 8; _x++) {
+            ctx.fillStyle = '#'+colors[which[_y][_x]];
+            ctx.fillRect((_x*tw)+1, (_y*th)+1,(tw-2),(th-2));
+        }
+    if (!win) return;
+    ctx.font = "bold 80px sans-serif";
+    ctx.shadowColor = "rgb(0, 0, 0)";
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 5;
+    ctx.shadowBlur = 10;
+    var gradient = ctx.createLinearGradient(0, 30, 0, 100);
+    gradient.addColorStop(0, "rgb(255, 255, 0)");
+    gradient.addColorStop(1, "rgb(255, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillText("You Win!", 25, 100);
+}
+draw();
+
+function mtot(x,y) {return {x:((x / tw)|0), y:((y / th)|0)};}
+                             
+// The game...
+function flipTarget(e) {
+    // toggle show target
+    console.log(JSON.stringify(current)); // uncomment to help make games.
+    showTarget = !showTarget;
+    draw();
+}
+
+function startMove(e){
+    // register start of motion
+    drag = true;
+    var p = mtot(e.pageX - 10, e.pageY - 10);
+    ox = p.x; oy = p.y;
+    row = oy; col = ox;
+    draw();
+}
+function endMove(e){drag=false;dx=dy=0;row=col=-1;}
+function slideMove(e){
+    // moving
+    if (showTarget || !drag) return;
+    var p = mtot(e.pageX - 10, e.pageY - 10);
+    if (p.x == ox && p.y == oy) return; // not moved out
+    dx = ox - p.x; dy = oy - p.y;
+    ox = p.x; oy = p.y;
+    
+    // todo: lock direction
+    
+    slide(row, col, dx, dy);
+    
+    // check if solution
+    if (JSON.stringify(current) == JSON.stringify(target)) {
+        c.onmousedown = undefined;
+        c.ondblclick = undefined;
+        showTarget = drag = false;
+        win = true;
+    }
+    draw();
+}
+
+rotate = function(a, p){
+    for(var l = a.length, p = (Math.abs(p) >= l && (p %= l), p < 0 && (p += l), p), i, x; p; p = (Math.ceil(l / p) - 1) * p - l + (l = p))
+        for(i = l; i > p; x = a[--i], a[i] = a[i - p], a[i - p] = x);
+    return a;
+};
+
+function slide(r, c, ddx, ddy) {
+    // slide row
+    rotate(current[r], -ddx);
+    
+    // slide col. more tricky
+    if (ddy == 0) return;
+    var cp = current.map(function(_r){return _r[c];});
+    rotate(cp, -ddy);
+    for(var _r=0;_r<8;_r++){current[_r][c] = cp[_r];}
+}
+
+// interaction
+c.ondblclick = flipTarget;
+c.onmousedown = startMove;
+c.onmouseup = endMove;
+c.onmouseout = endMove;
+c.onmousemove = slideMove;

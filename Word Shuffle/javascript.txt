@@ -1,0 +1,282 @@
+// the basics...
+var c = document.getElementById('canvas');
+var canvasWidth = c.width;
+var canvasHeight = c.height;
+var ctx = c.getContext('2d');
+ctx.globalCompositeOperation = "source-over";
+document.onselectstart = function () {
+    return false;
+}; // ie
+document.onmousedown = function () {
+    return false;
+}; // others
+
+
+function saveLevel (level) {
+    document.cookie = "WordShuffleLvl=" + level +  "; path=/";
+}
+
+function getLevel() {
+    if (document.cookie.length > 0) {
+        c_start = document.cookie.indexOf("WordShuffleLvl=");
+        if (c_start != -1) {
+            c_start = c_start + 15;
+            c_end = document.cookie.indexOf(";", c_start);
+            if (c_end == -1) {
+                c_end = document.cookie.length;
+            }
+            return unescape(document.cookie.substring(c_start, c_end));
+        }
+    }
+    return 0;
+}
+
+var active = true, designMode = false;
+var target, current, layout, shiftmap, levelClue;
+var level = getLevel();
+var levels = [{
+    // First level
+    target: "RED"+"GREEN"+"BLUE",
+    clue: "Blushing, Envious, Sad",
+    layout: {
+        tileSize: 50,
+        rows: [
+            {x: 90,y: 10,len: 3},
+            {x: 10,y: 80,len: 5},
+            {x: 30,y: 150,len: 4}
+        ]
+    },
+    moves:function(index){
+        switch(index){
+            case 0: case 1: case 2: 
+                     return [1,2,0,3,4,5,6,7,8,9,10,11];
+            case 3:  return [3,1,2,8,4,5,6,7,0,9,10,11];
+            case 7:  return [0,1,11,3,4,5,6,2,8,9,10,7];
+            default: return [0,1,2,4,5,6,7,11,3,8,9,10];
+        }
+    }
+},
+{
+    // Second level
+    target: "ANIMAL"+"VEGETABLE"+"MINERAL",
+    clue: "The birds and bees; The roots and leaves; The hills alone",
+    layout: {
+        tileSize: 50,
+        rows: [
+            {x: 45,y: 10,len: 6},
+            {x: 10,y: 80,len: 9},
+            {x: 85,y: 150,len: 7}
+        ]
+    },
+    moves:function(index){
+        if (index <= 5) return [14,0,1,2,3,4,6,7,8,9,10,11,12,13,5,15,16,17,18,19,20,21];
+        if (index <= 14) return [0,1,2,3,4,5,14,6,7,8,9,10,11,12,13,15,16,17,18,19,20,21];
+        return [0,1,2,3,4,5,15,7,8,9,10,11,12,13,14,16,17,18,19,20,21,6];
+    }
+},
+{
+    // third level
+    target:"YESTERDAY"+"TODAY"+"TOMORROW",
+    clue:"Gone away, here and now, coming soon",
+    layout: {
+        tileSize: 50,
+        rows: [
+            {x: 10,y: 10,len: 9},
+            {x: 75,y: 80,len: 5},
+            {x: 35,y: 150,len: 8}
+        ]
+    },
+    moves: function(index) {
+        if (index <= 8) return [9,0,1,2,3,4,5,6,7,10,11,12,13,8,14,15,16,17,18,19,20,21];
+        if (index <= 13) return [0,1,2,3,4,5,6,7,8,13,9,10,11,12,14,15,16,17,18,19,20,21];
+        return [0,1,2,3,4,5,6,7,8,14,9,10,11,12,15,16,17,18,19,20,21,13];
+    }
+},
+{
+    // fourth level
+    target:"LEFT"+"RIGHT",
+    clue:"Left and right, but it's harder now.",
+    layout: {
+        tileSize: 60,
+        rows: [
+            {x: 10,y: 10,len: 4},
+            {x: 75,y: 80,len: 5}
+        ]
+    },
+    moves: function(index) {
+        if (index < 4) return [8,0,5,2,1,4,3,6,7];
+        return [1,2,3,4,5,6,7,8,0];
+    }
+}
+];
+
+// start the game:
+if (level >= levels.length) { // already completed. Restart.
+    level = 0;
+}
+advanceLevel();
+
+
+function permute(perm, src) {
+    var next = [];
+    for (var i = 0; i < perm.length; i++) {
+        next[perm[i]] = src[i];
+    }
+    return next;
+}
+
+c.ondblclick = function(e){e.stopPropagation();e.preventDefault();};
+c.onclick = function (e) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!active) return;
+    var x = e.pageX - c.offsetLeft;
+    var y = e.pageY - c.offsetTop;
+
+    // playing... find click pos
+    var sz = layout.tileSize;
+    var rows = layout.rows;
+    var cidx = 0; // which character
+    for (i = 0; i < rows.length; i++) { // for each row
+        var len = rows[i].len;
+        var L = rows[i].x,
+            T = rows[i].y;
+        var R = L + sz,
+            B = T + sz;
+
+        for (var j = 0; j < len; j++) { // each tile
+            if (x < R && x > L && y > T && y < B) {
+                var perm = shiftmap(cidx);
+                current = permute(perm, current);
+                drawGame();
+                
+                var curStr = current.join('');
+                if (curStr == target) {
+                    level++;
+                    saveLevel(level);
+                    advanceLevel();
+                }
+                return;
+            }
+            L += sz + 5;
+            R += sz + 5;
+            cidx++;
+        }
+    }
+};
+
+function drawGame() {
+    var y;
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    var j = 0,
+        sz = layout.tileSize,
+        rows = layout.rows,
+        cidx = 0; // which character
+    for (var i=0; i < rows.length; i++) {
+        var x = rows[i].x;
+            y = rows[i].y;
+            len = rows[i].len;
+        for (var n = 0; n < len; n++) {
+            var chr = current[cidx];
+            if (designMode) chr = ""+cidx;
+            drawTile(x, y, sz, sz, chr);
+            x += sz + 5;
+            cidx++;
+        }
+    }
+    
+    ctx.font = "15px sans-serif";
+    ctx.fillStyle = '#000';
+    ctx.fillText(levelClue, 10, y+sz+sz);
+}
+
+function shuffle(o){
+    for(var j, x, i = o.length; i; j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
+    return o;
+}
+
+function drawLevelUp() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.font = "bold 60px sans-serif";
+    var fg = ctx.createLinearGradient(0, 100, 0, 110);
+    fg.addColorStop(0, "rgb(0, 255, 255)");
+    fg.addColorStop(1, "rgb(0, 192, 255)");
+    ctx.shadowColor = "rgb(0, 0, 0)";
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = fg;
+    ctx.fillText("You got it!", 40, 120);
+    ctx.restore();
+}
+
+function advanceLevel() {
+    active = false;
+    
+    var lev = levels[level];
+    
+    if (!lev) {
+        gameOver();
+        return;
+    }
+    
+    target = lev.target;
+    current = shuffle(lev.target.split(''));
+    levelClue = lev.clue;
+    layout = lev.layout;
+    shiftmap = lev.moves;
+    
+    if (level > 0) { // level-up. Show some glitter.
+        drawLevelUp();
+        setTimeout(function(){active = true; drawGame();}, 1000);
+    } else { // first level. Just go!
+        active = true; drawGame();
+    }
+}
+
+function gameOver() {
+    // todo: draw some tiles bouncing around
+    active = false;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.font = "bold 60px sans-serif";
+    var fg = ctx.createLinearGradient(0, 100, 0, 110);
+    fg.addColorStop(0, "rgb(0, 255, 255)");
+    fg.addColorStop(1, "rgb(0, 192, 255)");
+    ctx.shadowColor = "rgb(0, 0, 0)";
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = fg;
+    ctx.fillText("You win!", 40, 120);
+    ctx.restore();
+}
+
+function drawTile(x, y, w, h, str) {
+    ctx.save();
+    // background
+    var tg = ctx.createLinearGradient(0, y, 0, y + h);
+    tg.addColorStop(0, "rgb(192, 0, 128)");
+    tg.addColorStop(1, "rgb(64, 0, 64)");
+    ctx.fillStyle = tg;
+    ctx.fillRect(x, y, w, h);
+    // text over tile
+    var fh = (h * 0.7) | 0;
+    var fy = h - fh * 0.35;
+    ctx.font = "bold " + fh + "px sans-serif";
+    var fg = ctx.createLinearGradient(0, y + fy / 2, 0, y + fy * 1.5);
+    fg.addColorStop(0, "rgb(255, 255, 0)");
+    fg.addColorStop(1, "rgb(255, 0, 0)");
+    ctx.shadowColor = "rgb(0, 0, 0)";
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = fg;
+    var fw = ctx.measureText(str).width;
+    ctx.fillText(str, x + (w / 2) - (fw / 2), y + fy);
+    ctx.restore();
+}

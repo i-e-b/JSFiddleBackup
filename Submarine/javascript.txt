@@ -1,0 +1,49 @@
+var bk = document.getElementById("background");
+bk.width = 500;
+bk.height = 300;
+var bkCtx = bk.getContext("2d");
+var canvas = document.getElementById("canvas");
+canvas.width = 500;
+canvas.height = 300;
+var ctx = canvas.getContext("2d");
+
+function multiFill() {
+ctx.shadowBlur = 100;
+ctx.fill();
+ctx.shadowBlur = 20;
+ctx.fill();
+ctx.shadowBlur = 5;
+ctx.fill();
+}
+
+bkCtx.fillStyle = "#003";
+bkCtx.fillRect(0, 0, canvas.width, canvas.height);
+bkCtx.beginPath();
+bkCtx.arc(100, 100, 10, 0, Math.PI * 2, false);
+bkCtx.strokeStyle = "#05A";
+bkCtx.fillStyle = "#000";
+bkCtx.lineWidth = 1;
+bkCtx.stroke();
+bkCtx.fill();
+
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+ctx.shadowColor = '#0af';
+ctx.shadowBlur = 150;
+ctx.shadowOffsetX = 0;
+ctx.shadowOffsetY = 0;
+ctx.strokeStyle = "#05A";
+ctx.fillStyle = "#0AF";
+
+ctx.beginPath();
+ctx.arc(50, 100, 30, 0, Math.PI * 2, false);
+ctx.lineWidth = 3;
+ctx.closePath();
+multiFill();
+
+ctx.beginPath();
+ctx.rect(188, 40, 200, 100);
+ctx.closePath();
+ctx.stroke();
+multiFill();
+

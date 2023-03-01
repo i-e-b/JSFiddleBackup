@@ -1,0 +1,6 @@
+<div id="container">
+    <canvas id="background" class="subcanvs"></canvas>
+    <canvas id="canvas" class="subcanvs"></canvas>
+</div>
+
+For the mechanism test, see https://jsfiddle.net/i_e_b/duny8n6h/

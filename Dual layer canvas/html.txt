@@ -1,0 +1,5 @@
+<p>Bottom canvas has grass+sky, top canvas has sun</p>
+<div id="container">
+    <canvas id="background" class="subcanvs"></canvas>
+    <canvas id="canvas" class="subcanvs"></canvas>
+</div>

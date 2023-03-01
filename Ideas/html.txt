@@ -1,0 +1,12 @@
+<pre>
+Current Ideas
+    - Folding puzzle version of 2048/threes. Larger play field, with preplaced tiles. Player can fold parts of the play area over (4 directions). Overlapping tiles must be equal, in which case they merge. Goal is to merge to a singe tile.
+    - Bomberman (sprites, multiplayer on one screen)
+    - Play with some sound generation
+    - Worms like (detect changes to bitmap)
+    - An A.I. for dots-and-boxes: <a href="https://www.youtube.com/watch?v=KboGyIilP6k">video</a>
+   - simple 2d papermariolike game, based on [http://www.squidi.net/three/entry.php?id=198, http://www.squidi.net/three/entry.php?id=197, http://www.squidi.net/three/entry.php?id=217]
+</pre>
+General:
+  http://www.thefoolandhismoney.com/02-at-the-carnival/screen-shots.htm
+  http://www.thefoolandhismoney.com/03-in-three/screen-shots.htm

@@ -1,0 +1,6 @@
+<p>Click to ping</p>
+<p>Arrow keys to drive sub, space-bar to send a ping from the sub. Shift key sends off a bomb. WSAD to drive 'enemy' sub</p>
+<div id="container">
+    <canvas id="background" class="subcanvs"></canvas>
+    <canvas id="canvas" class="subcanvs"></canvas>
+</div>

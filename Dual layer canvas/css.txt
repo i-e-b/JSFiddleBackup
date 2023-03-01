@@ -1,0 +1,11 @@
+    #container {
+        position:relative;
+        border:1px solid blue;
+        width:500px;
+        height:300px;
+    }
+    .subcanvs {
+        position:absolute;
+        width:100%;
+        height:100%;
+    }

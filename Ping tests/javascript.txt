@@ -1,0 +1,274 @@
+// TODO:
+// when a ping hits, use owner information to show ping (the sonar
+//     just isn't fun as a game, realistic as it may be!)
+
+// Function lookup:
+//
+// PING  - Perturb water
+// F  - Math.floor
+// R  - Math.random
+
+// Adjustable Settings:
+var pingStrength = 1e5; // strength of wave from a ping when we start it
+var engineStrength = 100; // strength of wave from moving the sub
+var bombStrength = 1e8; // strength of wave from a depth-charge going off
+var damageThreshold = 1e6; // minimum pressure to damage sub
+var pingThreshold = 1e3; // minimum height that registers as ping wave
+var wallThreshold = 10; // minimum height to show wall
+var damping = 6; // 1-10; default 6; lower means pings last longer and go further
+var pixelSize = 2;
+
+// keyboard control of submarine
+var control = {up:false, down:false, left:false, right:false};
+var ctrl2 = {up:false, down:false, left:false, right:false};
+
+// Initialise variables
+var w = 200,// w  - Pixels across
+    h = 200,// h  - Pixels high
+    p = (w*h),// p  - Total pixels
+    x, y, z,// x,y,z  - Temp vars
+    m = [],// m  - First heightmap buffer
+    n = [],// n  - Second heightmap buffer
+    ob = [],// ob - obstacle buffer (0 is wall, 1 is open)
+    sub = 0,// sub - location of the player's submarine
+    nme = 0,// location of enemy sub
+    health = 255,// health - when it gets to zero, sub is toast.
+    F = Math.floor,
+    R = Math.random,
+    owner = []; // who caused this wave? Could be used for index in p
+
+// get drawing surfaces
+var bk = document.getElementById("background");
+bk.width = w * pixelSize;
+bk.height = h * pixelSize;
+var fade = bk.getContext("2d");
+var c = document.getElementById("canvas");
+c.width = w * pixelSize;
+c.height = h * pixelSize;
+var d = canvas.getContext("2d");
+
+// clear water buffers
+for (z = p; z--;) {m[z] = n[z] = 0; ob[z] = 1; owner[z] = 0; }
+// draw obstacle buffer (todo: make this half-res of wave buffer?)
+drawIntoArray('Ping', w, 48, ob);
+// stick sub in the middle
+sub = F((p/2)+(w/2));
+
+// Tick the simulation and render
+setInterval(function () {
+    //wipe graphics
+    d.fillStyle = "#000";
+    d.clearRect(0, 0, w*pixelSize, h*pixelSize);
+    
+    // Fading to black
+    fade.save();
+    fade.globalCompositeOperation = 'multiply';
+    fade.fillStyle = 'rgb(240,240,240)';
+    fade.fillRect(0, 0, w*pixelSize, h*pixelSize);
+    fade.restore();
+
+    fade.fillStyle = "#5AF"; // bright for walls
+    
+    // damp the 'top' to reduce reflections
+    for (x=w; x--;){
+        n[x] -= n[x] >> 2;
+        n[x+w] -= n[x+w] >> 4;
+        n[x+w+w] -= n[x+w+w] >> 8;
+    }
+    // Update water height map - see algorithm for explanation
+    for (x = z = (p-w); x--;){
+    
+        // Calculate new value based on previous 2 frames
+        var l = (p + x - 1) % p; // left
+        var r = (x + 1) % p;     // right
+        var a = (p + x - w) % p; // above
+        var b = (x + w) % p;     // below
+        
+        n[x] = ((m[r] + m[l] + m[b] + m[a]) >> 1) - n[x];
+        
+        // experiment: copy owner from highest abs value.
+        var hm,ha = Math.abs(m[x]);
+        if (ha < (hm = Math.abs(m[r]))) {owner[x] = owner[r]; ha = hm;}
+        if (ha < (hm = Math.abs(m[l]))) {owner[x] = owner[l]; ha = hm;}
+        if (ha < (hm = Math.abs(m[b]))) {owner[x] = owner[b]; ha = hm;}
+        if (ha < (hm = Math.abs(m[a]))) {owner[x] = owner[a];}
+        
+        if (!ob[x]) { // current x is a wall
+            if (Math.abs(n[x]) > wallThreshold) { // show wave hit wall
+                fade.fillRect(x % w * pixelSize, F(x / w) * pixelSize, pixelSize, pixelSize);
+            }
+            n[x] = 0; // suppress, will cause bounce in neigbours
+        } else {
+            // Apply damping. Higher shift = waves go further
+            n[x] -= n[x] >> (10-damping);
+        }
+    }
+    
+    // Swap water buffers over
+    x = m; m = n; n = x; z = p;
+    
+    // Render pulse wave (slowest part)
+    for (; z-= 4;) {
+        // Draw a pixel if height at this point
+        // is above the 'hearing' threshold
+        if (m[z] < pingThreshold) continue;
+        
+        d.fillStyle = (m[z] < damageThreshold) ? '#005' : '#F0F';
+        
+        d.fillRect(z % w * pixelSize, F(z / w) * pixelSize, pixelSize, pixelSize);
+    };
+
+    // Control the sub & do any damage
+    nme = moveSub(nme, ctrl2, health);
+    sub = moveSub(sub, control, health);
+    
+    // Draw vector of gradient at centre (direction of ping)
+    drawSonar(nme, '#F00');
+    drawSonar(sub, '#0F0');
+    
+    drawPingSource(sub);
+    
+    d.fillText("Health: "+F(health/2.55)+"%", 10,10);
+    
+    // zero the subs so pings reflect from them (always after damage)
+    //n[sub] = 0;
+    //n[nme] = 0;
+}, 1000/30);
+
+function drawPingSource(loc) {
+    // TODO: our ping hits an enemy, we see a direction arrow
+    //       if we are hit by an enemy ping, (?direction or dot?)
+    //       Either case, a friendly always shows a dot
+    // if there is a ping, draw a dot at the 'owner' origin
+    if (m[loc] > wallThreshold){
+        fade.fillStyle = '#0F0';
+        drawPt(fade, (owner[loc]) %p, 3);
+    }
+}
+
+function drawSonar(loc, colour) {
+    var vec = {
+        x : ((m[(p+loc-1)%p]-m[(loc+1)%p])) / 5,
+        y : ((m[(p+loc-w)%p]-m[(loc+w)%p])) / 5
+    }
+    var mg = pin(30, vec);
+    fade.fillStyle = colour;
+    
+    var dsz = (n[loc] > 0 && m[loc] > 0 && n[loc] >= m[loc]) ? 2 : 0;
+    var msz = mg > 30 ? 2:0;
+    drawPt(fade, (loc + F(vec.x) + (F(vec.y)*w)) %p, dsz+msz);
+}
+
+function moveSub(loc, ctrl, health) {
+    var ns = loc;
+    if (ctrl.up) ns -= w;
+    if (ctrl.down) ns += w;
+    if (ctrl.left) ns--;
+    if (ctrl.right) ns++;
+    ns = ns % p;
+    if (ns !== loc) BUZZ(ns); // moved
+    if (ob[ns]) loc = ns; // else bashed into wall!
+    else {
+        health = Math.max(0, health - 1);
+    }
+    if (m[loc] >= damageThreshold) {
+        health = Math.max(0, health - 18); // just enough that a direct hit kills
+    }
+
+    // draw the submarine
+    var sca = ('0' + (health).toString(16)).slice(-2);
+    var scb = ('0' + (255 - health).toString(16)).slice(-2);
+    d.fillStyle = '#'+scb+sca+sca;
+    drawPt(d, loc);
+    return loc;
+}
+
+function pin(max, v) {
+    var mg = (v.x*v.x)+(v.y*v.y);
+    var sm = (max*max);
+    if (mg < sm) return;
+    var dd = mg / sm;
+    v.x /= dd; v.y /= dd;
+    return mg;
+}
+function drawPt(ctx,pt, szz) {
+    var sz = szz || 0;
+    ctx.fillRect(pt % w * pixelSize, F(pt / w) * pixelSize, pixelSize + sz, pixelSize + sz);
+}
+
+// Strong pressure pulse at point `i`
+function PING(i) {
+    // Push down a cross of pixels centered on i
+    // negative starting height gives rounder 'ping'
+    // as we are detecting the positive waves.
+    m[i + 1] = m[i - 1] = m[i + w] = m[i - w] = m[i] = -pingStrength;
+    
+    // experiment: owner
+    owner[i + 1] = owner[i - 1] = owner[i + w] = owner[i - w] = owner[i] = i;
+}
+// Weak pressure pules at point `i` (like from engine noise)
+function BUZZ(i) {
+    m[i] = engineStrength;
+    owner[i] = i;
+}
+// Huge pressure pulse at point `i` (like from a depth-charge)
+function BOMB(i) {
+    m[i + 1] = m[i - 1] = m[i + w] = m[i - w] = m[i] = -bombStrength;
+}
+
+// Register mouse handler to stir water
+c.onclick = function (e) {
+    PING(F(e.offsetX / pixelSize) + w * F(e.offsetY / pixelSize))
+};
+document.onkeydown = function(e){
+    e = e || window.event;
+    if (e.keyCode == '38') {control.up = true;}
+    else if (e.keyCode == '40') {control.down=true;}
+    else if (e.keyCode == '37') {control.left=true;}
+    else if (e.keyCode == '39') {control.right=true;}
+    
+    else if (e.keyCode == '87') {ctrl2.up = true;}
+    else if (e.keyCode == '83') {ctrl2.down = true;}
+    else if (e.keyCode == '65') {ctrl2.left = true;}
+    else if (e.keyCode == '68') {ctrl2.right = true;}
+    
+    else if (e.keyCode == '32') {PING(sub);}
+    else if (e.keyCode == '16') {BOMB(sub);}
+    e.stopPropagation(); e.preventDefault();
+    return false;
+};
+document.onkeyup = function(e){
+    e = e || window.event;
+    if (e.keyCode == '38') {control.up = false;}
+    else if (e.keyCode == '40') {control.down=false;}
+    else if (e.keyCode == '37') {control.left=false;}
+    else if (e.keyCode == '39') {control.right=false;}
+    
+    else if (e.keyCode == '87') {ctrl2.up = false;}
+    else if (e.keyCode == '83') {ctrl2.down = false;}
+    else if (e.keyCode == '65') {ctrl2.left = false;}
+    else if (e.keyCode == '68') {ctrl2.right = false;}
+    
+    e.stopPropagation(); e.preventDefault();
+    return false;
+};
+
+// draw a string into a bool array
+// this is very rough, but give the idea
+function drawIntoArray(str, width, height, target) {
+    var c = document.createElement('canvas');
+    c.width = width;
+    c.height = height;
+    var a = c.getContext( '2d' );
+    a.fillStyle = "#000";
+    a.fillRect(0, 0, c.width, c.height);
+
+    a.fillStyle = "#fff";
+    a.font = (height*0.8) + 'px sans';
+    a.fillText(str, 10, height*0.8);
+    var data = a.getImageData(0, 0, c.width, c.height).data;
+    var sz = width*height;
+    for(var i=0;i<sz;i++) {
+        target[i] = ((data[i*4] > 100) ? (0) : (1));
+    }
+}

@@ -1,0 +1,33 @@
+var bk = document.getElementById("background");
+var bkCtx = bk.getContext("2d");
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+
+var bkimg = new Image();
+bkimg.onload = function () {
+    bk.width = bkimg.width;
+    bk.height = bkimg.height;
+    canvas.width = bkimg.width;
+    canvas.height = bkimg.height;
+    bkCtx.drawImage(bkimg, 0, 0);
+    draw();
+}
+bkimg.src = "https://www.publicdomainpictures.net/pictures/90000/velka/green-grass-and-blue-sky-1398454014G2m.jpg";
+
+var x = 50;
+
+function draw() {
+    x += 5;
+    if (x > 300) {
+        x = 50;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.arc(x, 100, 30, 0, Math.PI * 2, false);
+    ctx.strokeStyle = "gold";
+    ctx.fillStyle = "yellow";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.fill();
+    setTimeout(draw, 100);
+}
